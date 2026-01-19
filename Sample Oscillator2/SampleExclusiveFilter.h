@@ -7,7 +7,7 @@ class SampleExclusiveFilter : public MpBase
 {
 public:
 	SampleExclusiveFilter( IMpUnknown* host );
-	virtual void onMidiMessage( int pin, unsigned char* midiMessage, int size );
+	void onMidiMessage( int pin, unsigned char* midiMessage, int size ) override;
 
 private:
 	MidiInPin pinMidiIn;

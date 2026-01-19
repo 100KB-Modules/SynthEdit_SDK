@@ -4,6 +4,8 @@
 #include <math.h>
 #include "../shared/xplatform_modifier_keys.h"
 
+SE_DECLARE_INIT_STATIC_FILE(VectorRing);
+
 using namespace gmpi;
 using namespace gmpi_gui;
 using namespace GmpiDrawing;
@@ -64,24 +66,17 @@ protected:
 
 		float coarseness = 0.005f;
 
-//		if (modifier_keys::isHeldCtrl()) // <cntr> key magnifies
 		if (flags & gmpi_gui_api::GG_POINTER_KEY_CONTROL) // <cntr> key magnifies
 			coarseness = 0.001f;
 
 		float new_pos = pinAnimationPosition;
-		new_pos = new_pos - coarseness * (float)offset.y;
-
-		if (new_pos < 0.f)
-			new_pos = 0.f;
-
-		if (new_pos > 1.f)
-			new_pos = 1.f;
-
-		pinAnimationPosition = new_pos;
+		new_pos = std::clamp(new_pos - coarseness * (float)offset.y, 0.0f, 1.0f);
 
 		pointPrevious = point;
 
 		invalidateRect();
+
+		pinAnimationPosition = new_pos;
 
 		return gmpi::MP_OK;
 	}
@@ -325,7 +320,7 @@ class VectorPanKnob : public VectorKnob
 			auto arcGeometry = g.GetFactory().CreatePathGeometry();
 			auto sink = arcGeometry.Open();
 			sink.BeginFigure(midPoint);
-			if (nomalised < 0.5f)
+			if (nomalised <= 0.5f)
 			{
 				sink.AddArc(ArcSegment(movingPoint, circleSize, 0.0f, SweepDirection::CounterClockwise, ArcSize::Small));
 			}
@@ -345,7 +340,7 @@ class VectorPanKnob : public VectorKnob
 			auto sink = arcGeometry.Open();
 			sink.BeginFigure(center);
 			sink.AddLine(movingPoint);
-			if (nomalised < 0.5f)
+			if (nomalised <= 0.5f)
 			{
 				sink.AddArc(ArcSegment(startPoint, circleSize, 0.0f, SweepDirection::CounterClockwise, ArcSize::Small));
 			}
@@ -487,6 +482,144 @@ public:
 	}
 };
 
+class VectorKnobCGui : public VectorKnob
+{
+	int32_t MP_STDCALL OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext) override
+	{
+		Graphics g(drawingContext);
+
+		const float centerDotRadius = 0.7f; // proportional
+		const float indicatorDotRadius = 0.09f; // proportional
+		
+		Point center;
+		float radius;
+		float thickness;
+		calcDimensions(center, radius, thickness);
+
+		auto brushForeground = g.CreateSolidColorBrush(Color::FromHexString(pinForeground));
+		auto brushBackground = g.CreateSolidColorBrush(Color::FromHexString(pinBackground));
+
+		const float startAngle = 35.0f; // angle between "straight-down" and start of arc. In degrees.
+		const float startAngleRadians = startAngle * M_PI / 180.f; // angle between "straight-down" and start of arc. In degrees.
+		const float quarterTurnClockwise = M_PI * 0.5f;
+
+		StrokeStyleProperties strokeStyleProperties;
+		strokeStyleProperties.setCapStyle(CapStyle::Round);
+		strokeStyleProperties.setLineJoin(LineJoin::Round);
+		auto strokeStyle = g.GetFactory().CreateStrokeStyle(strokeStyleProperties);
+
+		Point startPoint(center.x + radius * cosf(quarterTurnClockwise + startAngleRadians), center.y + radius * sinf(quarterTurnClockwise + startAngleRadians));
+		Point midPoint(center.x, center.y - radius);
+		float sweepAngle = (M_PI * 2.0f - startAngleRadians * 2.0f);
+		Point endPoint(center.x + radius * cosf(quarterTurnClockwise + startAngleRadians + sweepAngle), center.y + radius * sinf(quarterTurnClockwise + startAngleRadians + sweepAngle));
+
+		float nomalised = pinAnimationPosition;
+		sweepAngle = nomalised * (static_cast<float>(M_PI) * 2.0f - startAngleRadians * 2.0f);
+		float dotRadius = radius * (1.f + centerDotRadius) * 0.5f; // half-way between center dot and outer radius.
+		Point movingPoint(center.x + dotRadius * cosf(quarterTurnClockwise + startAngleRadians + sweepAngle), center.y + dotRadius * sinf(quarterTurnClockwise + startAngleRadians + sweepAngle));
+
+		Size circleSize(radius, radius);
+
+		// Background circle.
+		{
+			g.FillCircle(center, radius + thickness * 0.5f, brushBackground);
+		}
+
+		// Line.
+		{
+//			g.DrawLine(center, movingPoint, brushForeground, thickness, strokeStyle);
+		}
+
+		{
+			const int numSides = 7;
+
+			auto factory = g.GetFactory();
+			auto geometry = factory.CreatePathGeometry();
+			auto sink = geometry.Open();
+
+			for (int i = 0; i <= numSides * 2; ++i)
+			{
+				float bumpHollowRatio = /*NORMALISED*/ 0.8F - 0.5f; // -0.5 (shallow indents) ,0 (even), 0.5 (narrow bumps)
+
+				bool odd = (i & 0x1) == 0;
+				double f = 0.5 + i + (odd ? -bumpHollowRatio : bumpHollowRatio);
+				double pos = f / (2.0 * (double)numSides);
+
+				double tipAngle = quarterTurnClockwise + startAngleRadians + sweepAngle;
+				double a = tipAngle + (2.0 * M_PI) * pos;
+				float x = radius * cosf(a);
+				float y = radius * sinf(a);
+				Point p = center + Size(x, y);
+
+				if (i == 0)
+				{
+					sink.BeginFigure(p, FigureBegin::Filled);
+				}
+				else
+				{
+					/*
+					//  polygon
+					sink.AddLine(p);
+					*/
+
+					/*
+					// Flower
+					const float rightAngle = M_PI * 0.5f;
+					const float scallopRadius = 0.3f;
+					ArcSegment as(p, Size(scallopRadius, scallopRadius), rightAngle);
+					sink.AddArc(as);
+					*/
+					float scallopRadius;
+					if (odd)
+						scallopRadius = radius;
+					else
+						scallopRadius = radius * 0.7f; // (0.2 + nomalised);
+
+					auto sweep = (SweepDirection)odd;
+					ArcSegment as(p, Size(scallopRadius, scallopRadius), 0.0f, sweep, ArcSize::Small);
+					sink.AddArc(as);
+				}
+			}
+
+			sink.EndFigure();
+			sink.Close();
+
+			// Knob background
+			auto brush5 = g.CreateSolidColorBrush(Color::Gray);
+			g.FillGeometry(geometry, brush5);
+
+			// Center dot
+			auto brush4 = brushForeground; // g.CreateSolidColorBrush(Color::FromRgb(0xCCCCCC));
+			g.FillCircle(center, radius * centerDotRadius, brush4);
+
+			// gradient over top
+			auto topCol = Color::FromArgb(0x00000000);
+			auto botCol = Color::FromArgb(0xCC000000);
+
+			GradientStop gradientStops[]
+			{
+				{ 0.0f, topCol },
+				{ 1.0f, botCol },
+			};
+
+			auto gradientBrush = g.CreateLinearGradientBrush(gradientStops, center - Size(0.0f, radius), center + Size(0.0f, radius));
+
+			g.FillGeometry(geometry, gradientBrush);
+/* ?
+			const float penWidth = 1.0f;
+			auto brush2 = g.CreateSolidColorBrush(Color::Black);
+			g.DrawGeometry(geometry, brush2, penWidth);
+			*/
+
+			// White dot
+			auto brush3 = g.CreateSolidColorBrush(Color::White);
+			g.FillCircle(movingPoint, radius * indicatorDotRadius, brush3);
+		}
+
+		return gmpi::MP_OK;
+	}
+};
+
 namespace
 {
 	bool r[] =
@@ -496,5 +629,6 @@ namespace
 	Register<VectorKnob>::withId(L"SE Vector Knob"),
 	Register<VectorPanKnob>::withId(L"SE Vector Pan Knob"),
 	Register<VectorKnob_VCV>::withId(L"SE Vector Knob2"),
+	Register<VectorKnobCGui>::withId(L"SE Vector Knob C"),
 	};
 }

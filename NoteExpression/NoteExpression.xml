@@ -1,6 +1,19 @@
 <?xml version="1.0" ?>
 <PluginList>
-  <Plugin id="SE Note Expression" name="Note Expression" category="MIDI" polyphonicSource="true" cloned="true" graphicsApi="none">
+	<Plugin id="SE Note Expression2" name="Per-Note Controllers" category="MIDI" polyphonicSource="true" polyphonic="true" cloned="true">
+		<Audio>
+			<Pin name="Volume" datatype="float" private="true" hostConnect="Voice/Volume" />
+			<Pin name="Pan" datatype="float" private="true" hostConnect="Voice/Pan" />
+			<Pin name="Brightness" datatype="float" private="true" hostConnect="Voice/Brightness" />
+			<Pin name="Pressure" datatype="float" private="true" hostConnect="Voice/Aftertouch" />
+
+			<Pin name="Volume" datatype="float" direction="out" />
+			<Pin name="Pan" datatype="float" direction="out" />
+			<Pin name="Brightness" datatype="float" direction="out" />
+			<Pin name="Pressure" datatype="float" direction="out" />
+		</Audio>
+	</Plugin>
+	<Plugin id="SE Note Expression" name="Note Expression" category="Old" polyphonicSource="true" cloned="true" graphicsApi="none">
     <Audio>
       <Pin id="0" name="Note Volume" datatype="float" direction="in" private="true" hostConnect="Voice/Volume" />
       <Pin id="1" name="Note Pan" datatype="float" direction="in" private="true" hostConnect="Voice/Pan" />

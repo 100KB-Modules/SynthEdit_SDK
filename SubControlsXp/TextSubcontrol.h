@@ -1,8 +1,8 @@
 #pragma once
-#include "../se_sdk3/mp_gui.h"
-#include "../shared/FontCache.h"
 #include "mp_sdk_gui2.h"
+#include "../se_sdk3/mp_gui.h"
 #include "../se_sdk3/Drawing.h"
+#include "../shared/FontCache.h"
 
 class TextSubcontrol : public gmpi_gui::MpGuiGfxBase, public FontCacheClient
 {

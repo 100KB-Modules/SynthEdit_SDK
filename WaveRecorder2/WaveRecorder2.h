@@ -33,10 +33,11 @@ class WaveRecorder2 : public MpBase2
 public:
 	WaveRecorder2();
 	~WaveRecorder2();
+	void CloseFile();
 	virtual int32_t MP_STDCALL open() override;
 	void subProcess(int sampleFrames);
 	void subProcess16bit(int sampleFrames);
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 
 private:
 	StringInPin pinFileName;
@@ -47,9 +48,10 @@ private:
 	std::vector< float* > AudioInPtrs;
 	std::vector< unsigned char > AudioBuffer;
 	FILE* outputStream;
-	int sampleFrameCount;
+	int64_t sampleFrameCount;
 
 	wave_file_header2 waveHeader;
+	int64_t maxFrames = -1;
 };
 
 #endif

@@ -21,12 +21,12 @@ public:
 
 	void processWithGate( int start_pos, int sampleframes );
 	void subProcess( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	void onSetPins() override;
 
 	void NextMidiEvent(int bufferOffset);
-	int loadMidiFile(void);
-	void ResetTracks(void);
-	void Done(void);
+	int loadMidiFile();
+	void ResetTracks();
+	void Done();
 
 	void Setbpm(double newbpm);
 
@@ -43,7 +43,7 @@ public:
 	virtual bool loopEntireFile()
 	{
 		return pinLoopMode;
-	};
+	}
 	void OnGateChange( int blockPosition = -1 );
 	void ChooseSubProcess();
 	void NotesOff(int blockPosition);
@@ -57,6 +57,7 @@ protected:
 	FloatInPin pinHostBpm;
 	IntInPin pinTempoFrom;
 	BoolInPin pinLoopMode;
+	BoolInPin pinSendClocks;
 
 	float file_bpm; /* beats per minute */
 	bool gate_state;

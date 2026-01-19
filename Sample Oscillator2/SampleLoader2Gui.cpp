@@ -2,6 +2,7 @@
 #include "SampleLoader2Gui.h"
 #include "csoundfont.h"
 #include "RiffFile2.h"
+#include "../shared/unicode_conversion.h"
 
 REGISTER_GUI_PLUGIN( SampleLoader2Gui, L"SE Sample Loader2Gui" );
 
@@ -19,24 +20,24 @@ void SampleLoader2Gui::onFileNameChanged() // or Bank.
 	RiffFile2 riff;
 	uint32_t riff_type;
 
-	// open imbedded (or not) file.
-	gmpi::IProtectedFile* file = 0;
+	const auto fullFileName = uiHost.resolveFilename(pinFilename);
+	const auto fullFileNameU = JmUnicodeConversions::WStringToUtf8(fullFileName);
 
-	int r = getHost()->openProtectedFile( pinFilename.getValue().c_str(), &file );
-
-	if( r != gmpi::MP_OK )
+	auto stream2 = uiHost.OpenUri(fullFileNameU.c_str());
+	
+	if (!stream2)
 	{
 		pinPatchNames = L"<none>";
 		pinBankNames = L"<none>";
 		return;
 	}
 
-	riff.Open( file, riff_type );
+	riff.Open( stream2.get(), riff_type);
 
 	// Create list of chunks we could use
 	if( riff_type != MAKEFOURCC('s', 'f', 'b', 'k') )	// sf2 file
 	{
-		file->close();
+//		file->close();
 		return;
 	}
 
@@ -47,7 +48,7 @@ void SampleLoader2Gui::onFileNameChanged() // or Bank.
 
 	riff.ReadFile();
 
-	file->close();
+//	file->close();
 
 	std::string presetNames;
 
@@ -102,7 +103,7 @@ void SampleLoader2Gui::onFileNameChanged() // or Bank.
 
 	delete [] (char*) chunk_phdr;
 
-	// Convert patch names to UNICODE wide-string.
+	// Convert patch names to wide-string.
 	std::wstring presetNamesWideChar;
 
 	if( presets.size() != 0 )

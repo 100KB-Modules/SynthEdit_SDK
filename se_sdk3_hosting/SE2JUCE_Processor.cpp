@@ -4,20 +4,25 @@
 #include "unicode_conversion.h"
 #include "RawConversions.h"
 #include "BundleInfo.h"
+// #include "dsp_patch_manager.h" // enable for logging only
 
-//==============================================================================
-SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttributes(int32_t)> customizeParameter) :
+SE2JUCE_Processor::SE2JUCE_Processor(
+    std::unique_ptr<SeJuceController> pController,
+    std::function<juce::AudioParameterFloatAttributes(int32_t)> customizeParameter
+) :
+    controller(std::move(pController))
+
     // init the midi converter
-    midiConverter(
+    ,midiConverter(
         // provide a lambda to accept converted MIDI 2.0 messages
         [this](const gmpi::midi::message_view& msg, int offset)
         {
             processor.MidiIn(offset, msg.begin(), static_cast<int>(msg.size()));
         }
-    ),
+    )
 
 #ifndef JucePlugin_PreferredChannelConfigurations
-     AudioProcessor (BusesProperties()
+     ,AudioProcessor (BusesProperties()
                      #if ! JucePlugin_IsMidiEffect
                       #if ! JucePlugin_IsSynth
                        .withInput  ("Input",  juce::AudioChannelSet::stereo(), true)
@@ -27,10 +32,47 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
                        )
 #endif
 {
+#ifdef _DEBUG
+    //_RPT0(0, "\nSE2JUCE_Processor::SE2JUCE_Processor()\n");
+#endif
     BundleInfo::instance()->initPresetFolder(JucePlugin_Manufacturer, JucePlugin_Name);
 
-    processor.connectPeer(&controller);
-    controller.Initialize(this);
+    processor.connectPeer(controller.get());
+
+    // Initialize the DAW state manager
+    {
+        {
+            TiXmlDocument doc;
+            {
+                const auto xml = BundleInfo::instance()->getResource("parameters.se.xml");
+                doc.Parse(xml.c_str());
+                assert(!doc.Error());
+            }
+
+            TiXmlHandle hDoc(&doc);
+
+            auto controllerE = hDoc.FirstChildElement("Controller").Element();
+            assert(controllerE);
+
+            auto patchManagerE = controllerE->FirstChildElement();
+            assert(strcmp(patchManagerE->Value(), "PatchManager") == 0);
+
+            auto parameters_xml = patchManagerE->FirstChildElement("Parameters");
+
+            dawStateManager.init(parameters_xml);
+        }
+
+        dawStateManager.callback = [this](DawPreset const* preset)
+            {
+                // update Processor when preset changes
+                processor.setPresetUnsafe(preset);
+
+                // update Controller when preset changes
+                controller->setPresetUnsafe(preset);
+            };
+    }
+
+    controller->Initialize(this);
 
     if(!customizeParameter)
     {
@@ -38,14 +80,15 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
 	}
 
     int sequentialIndex = 0;
-    for(auto& p : controller.nativeParameters())
+    for(auto& p : controller->nativeParameters())
     {
 //        _RPTW2(0, L"%2d: %s\n", index, p->name_.c_str());
 
         juce::AudioProcessorParameter* juceParameter = {};
         if (p->isEnum())
         {
-            const int defaultItemIndex = {};
+            const auto defaultVal = static_cast<int32_t>(p->getValueReal());
+            int defaultItemIndex = {};
 
             it_enum_list it( (std::wstring)(p->getValueRaw(gmpi::MP_FT_ENUM_LIST, 0)) );
             juce::StringArray choices;
@@ -53,12 +96,17 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
             {
                 auto e = it.CurrentItem();
                 choices.add(juce::String(JmUnicodeConversions::WStringToUtf8(e->text)));
+
+				if (defaultVal == e->value)
+				{
+					defaultItemIndex = e->index;
+				}
             }
 
             juceParameter =
                 new juce::AudioParameterChoice(
-                    {std::to_string(sequentialIndex), 1},       // parameterID/versionhint
-                    WStringToUtf8(p->name_).c_str(),                // parameter name
+                    {std::to_string(sequentialIndex), 1}, // parameterID/versionhint
+                    WStringToUtf8(p->name_).c_str(),      // parameter name
                     choices,
                     defaultItemIndex
                 );
@@ -67,8 +115,8 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
         {
             juceParameter =
                 new juce::AudioParameterBool(
-                    { std::to_string(sequentialIndex), 1 },       // parameterID/versionhint
-                    WStringToUtf8(p->name_).c_str(),      // parameter name
+                    { std::to_string(sequentialIndex), 1 }, // parameterID/versionhint
+                    WStringToUtf8(p->name_).c_str(),        // parameter name
                     false
                 );
         }
@@ -84,8 +132,8 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
 
             juceParameter =
                 new juce::AudioParameterFloat(
-                    {std::to_string(sequentialIndex), 1},       // parameterID/versionhint
-                    WStringToUtf8(p->name_).c_str(),                // parameter name
+                    {std::to_string(sequentialIndex), 1},  // parameterID/versionhint
+                    WStringToUtf8(p->name_).c_str(),       // parameter name
                     { minimumReal, maximumReal },          // range
                     static_cast<float>(p->getValueReal()), // default value
                     attributes
@@ -93,9 +141,23 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
         }
 
         addParameter(juceParameter);
+        p->setJuceParameter(juceParameter);
+		dawIndexToParameterHandle.push_back(p->parameterHandle_);
 
         juceParameter->addListener(this);
         sequentialIndex++;
+    }
+
+    parameterUpdates.reserve(sequentialIndex);
+    for (auto& p : controller->nativeParameters())
+    {
+		const auto val = p->getDawNormalized();
+        parameterUpdates.push_back({ val,val });
+    }
+
+    // sync controller preset to the default preset.
+    {
+        controller->setPreset(dawStateManager.getPreset());
     }
 }
 
@@ -104,13 +166,26 @@ SE2JUCE_Processor::SE2JUCE_Processor(std::function<juce::AudioParameterFloatAttr
 // Cubase: called on main thread when changing param via mouse.
 void SE2JUCE_Processor::parameterValueChanged(int parameterIndex, float newValue)
 {
-    controller.setParameterNormalizedUnsafe(parameterIndex, newValue);
+    controller->setParameterNormalizedUnsafe(parameterIndex, newValue);
+	setNormalizedUnsafe(parameterIndex, newValue);
+}
+
+// DAW has changed a parameter, send it ASAP to processor.
+void SE2JUCE_Processor::setNormalizedUnsafe(int dawIndex, float daw_normalized)
+{
+	if (dawIndex < 0 || dawIndex >= parameterUpdates.size())
+	{
+		return;
+	}
+
+    parameterUpdates[dawIndex].pendingValue = daw_normalized;
+	juceParameters_dirty.store(true, std::memory_order_release);
 }
 
 void SE2JUCE_Processor::parameterGestureChanged(int parameterIndex, bool gestureIsStarting)
 {
     /* feedsback from GUI to GUI
-    if (auto p = controller.getDawParameter(parameterIndex); p)
+    if (auto p = controller->getDawParameter(parameterIndex); p)
     {
         p->setGrabbed(gestureIsStarting);
     }
@@ -119,6 +194,9 @@ void SE2JUCE_Processor::parameterGestureChanged(int parameterIndex, bool gesture
 
 SE2JUCE_Processor::~SE2JUCE_Processor()
 {
+#ifdef _DEBUG
+    //_RPT0(0, "\nSE2JUCE_Processor::~SE2JUCE_Processor()\n");
+#endif
 }
 
 //==============================================================================
@@ -161,28 +239,31 @@ double SE2JUCE_Processor::getTailLengthSeconds() const
 
 int SE2JUCE_Processor::getNumPrograms()
 {
-    return controller.getPresetCount();   // NB: some hosts don't cope very well if you tell them there are 0 programs,
+    return 1;
+//    return controller->getPresetCount();   // NB: some hosts don't cope very well if you tell them there are 0 programs,
                 // so this should be at least 1, even if you're not really implementing programs.
 }
 
 int SE2JUCE_Processor::getCurrentProgram()
 {
-    const auto parameterHandle = controller.getParameterHandle(-1, -1 - HC_PROGRAM);
+    return 0;
 
-    const auto program = (int32_t) controller.getParameterValue(parameterHandle, gmpi::MP_FT_VALUE);
-    _RPT1(0, "getCurrentProgram() -> %d\n", program);
-    return program;
+    //const auto parameterHandle = controller->getParameterHandle(-1, -1 - HC_PROGRAM);
+
+    //const auto program = (int32_t) controller->getParameterValue(parameterHandle, gmpi::MP_FT_VALUE);
+    //// _RPT1(0, "getCurrentProgram() -> %d\n", program);
+    //return program;
 }
 
 void SE2JUCE_Processor::setCurrentProgram (int index)
 {
-    controller.loadFactoryPreset(index, true);
+//    controller->loadFactoryPreset(index, true);
 }
 
 const juce::String SE2JUCE_Processor::getProgramName (int index)
 {
-    const auto safeIndex = (std::min)(controller.getPresetCount(), (std::max)(0, index));
-    return { controller.getPresetInfo(safeIndex).name};
+    const auto safeIndex = (std::min)(controller->getPresetCount(), (std::max)(0, index));
+    return { controller->getPresetInfo(safeIndex).name};
 }
 
 void SE2JUCE_Processor::changeProgramName (int, const juce::String&)
@@ -192,6 +273,9 @@ void SE2JUCE_Processor::changeProgramName (int, const juce::String&)
 //==============================================================================
 void SE2JUCE_Processor::prepareToPlay (double sampleRate, int samplesPerBlock)
 {
+    m_maxSamplesPerBlock = samplesPerBlock;
+    m_sampleRate = sampleRate;
+
     timeInfo.resetToDefault();
     memset(&timeInfoSe, 0, sizeof(timeInfoSe));
     timeInfoSe.tempo = 120.0;
@@ -204,6 +288,24 @@ void SE2JUCE_Processor::prepareToPlay (double sampleRate, int samplesPerBlock)
         samplesPerBlock,
         !isNonRealtime()
     );
+#ifdef _DEBUG
+    //_RPT0(0, "\nSE2JUCE_Processor::prepareToPlay()\n");
+#endif
+
+    OnLatencyChanged();
+
+	// Some DAWs can set the state before prepareToPlay is called. (and therefore before the generator is available to accept the preset).
+    // Bring processor up-to-date with state.
+    if(presetCount > 0)
+    {
+        auto preset = dawStateManager.getPreset();
+        processor.setPresetUnsafe(preset);
+    }
+}
+
+void SE2JUCE_Processor::OnLatencyChanged()
+{
+    setLatencySamples(processor.getLatencySamples());
 }
 
 void SE2JUCE_Processor::releaseResources()
@@ -241,6 +343,16 @@ bool SE2JUCE_Processor::isBusesLayoutSupported (const BusesLayout& layouts) cons
 void SE2JUCE_Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
+    if (processor.reinitializeFlag)
+    {
+        processor.prepareToPlay(
+            this,
+            static_cast<int32_t>(m_sampleRate),
+            m_maxSamplesPerBlock,
+            !isNonRealtime()
+        );
+    }
 
     if (getPlayHead() && getPlayHead()->getCurrentPosition(timeInfo))
     {
@@ -288,6 +400,25 @@ void SE2JUCE_Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         midiConverter.processMidi({ msg.data, msg.numBytes }, msg.samplePosition);
     }
 
+    // parameter updates from DAW?
+    if (const auto pdirty = juceParameters_dirty.exchange(false, std::memory_order_relaxed); pdirty)
+    {
+        assert(parameterUpdates.size() == dawIndexToParameterHandle.size());
+
+        int index = 0;
+        for (auto& p : parameterUpdates)
+        {
+            if (p.pendingValue != p.currentValue)
+            {
+                p.currentValue = p.pendingValue;
+                //				_RPTN(0, "processBlock parameter update: %d %f\n", index, p.pendingValue);
+
+                processor.setParameterNormalizedDaw(0, dawIndexToParameterHandle[index], p.currentValue, 0);
+            }
+            ++index;
+        }
+    }
+
     processor.process(
         buffer.getNumSamples(),
         buffer.getArrayOfReadPointers(),
@@ -295,6 +426,8 @@ void SE2JUCE_Processor::processBlock (juce::AudioBuffer<float>& buffer, juce::Mi
         getTotalNumInputChannels(),
         getTotalNumOutputChannels()
     );
+
+    dawStateManager.ProcessorWatchdog();
 }
 
 //==============================================================================
@@ -305,19 +438,27 @@ bool SE2JUCE_Processor::hasEditor() const
 
 juce::AudioProcessorEditor* SE2JUCE_Processor::createEditor()
 {
-    return new SynthEditEditor(*this, controller);
+    return new SynthEditEditor(*this, *controller.get());
 }
 
 //==============================================================================
 void SE2JUCE_Processor::getStateInformation (juce::MemoryBlock& destData)
 {
-    // You should use this method to store your parameters in the memory block.
-    // You could do that either as raw data, or use the XML or ValueTree classes
-    // as intermediaries to make it easy to save and load complex data.
+    const auto chunk = dawStateManager.getPreset()->toString(BundleInfo::instance()->getPluginId());
 
-    const bool active = true; // guess. ??
-    std::string chunk;
-    processor.getPresetState(chunk, active);
+#ifdef DEBUG_LOG_PM_TO_FILE
+    {
+        *DspPatchManager::currentLoggingFile << "SE2JUCE_Processor::getStateInformation\n";
+        *DspPatchManager::currentLoggingFile << chunk << "\n\n";
+    }
+#endif
+#ifdef _DEBUG
+    {
+        auto xml = chunk.substr(0, 500);
+
+        //_RPTN(0, "\nSE2JUCE_Processor::getStateInformation()\n %s\n\n", xml.c_str());
+    }
+#endif
 
     destData.replaceAll(chunk.data(), chunk.size());
 }
@@ -325,5 +466,24 @@ void SE2JUCE_Processor::getStateInformation (juce::MemoryBlock& destData)
 void SE2JUCE_Processor::setStateInformation (const void* data, int sizeInBytes)
 {
     const std::string chunk(static_cast<const char*>(data), sizeInBytes);
-	controller.setPresetFromDaw(chunk, true);
+
+#ifdef DEBUG_LOG_PM_TO_FILE
+    if(DspPatchManager::currentLoggingFile)
+    {
+        *DspPatchManager::currentLoggingFile << "SE2JUCE_Processor::setStateInformation\n";
+        *DspPatchManager::currentLoggingFile << chunk << "\n\n";
+    }
+
+#ifdef _DEBUG
+    {
+        auto xml = chunk.substr(0, 500);
+
+        _RPTN(0, "\nSE2JUCE_Processor::setStateInformation()\n %s\n\n", xml.c_str());
+    }
+#endif
+#endif
+
+    presetCount++;
+
+	dawStateManager.setPresetFromXml(chunk);
 }

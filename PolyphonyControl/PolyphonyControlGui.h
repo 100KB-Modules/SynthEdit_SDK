@@ -6,7 +6,6 @@
 class PolyphonyControlGui_base : public gmpi_gui::MpGuiInvisibleBase
 {
 public:
-//	PolyphonyControlGui_base();
 	virtual int32_t MP_STDCALL initialize() override;
 
 	void onSetPolyphony();
@@ -69,6 +68,7 @@ public:
 	void onSetVoiceRefresh();
 
 	void onSetHostVoiceAllocationMode();
+	void onSetMonoMode();
 	void onSetVoiceStealMode();
 	void onSetGlide();
 	void onSetGlideTiming();

@@ -3,6 +3,8 @@
 #include "./FloatFormula.h"
 #include "./my_type_convert.h"
 
+SE_DECLARE_INIT_STATIC_FILE(FloatFormula);
+
 REGISTER_PLUGIN ( FloatFormula, L"SE Float Function DSP" );
 
 using namespace std;
@@ -15,7 +17,7 @@ FloatFormula::FloatFormula( IMpUnknown* host ) : MpBase( host )
 	initializePin( 2, pinFormulaB );
 }
 
-void FloatFormula::onSetPins(void)
+void FloatFormula::onSetPins()
 {
 	if( pinFormulaB.isUpdated() )
 	{

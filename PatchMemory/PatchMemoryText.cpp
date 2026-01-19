@@ -1,9 +1,10 @@
 #include "./PatchMemoryText.h"
-//#include "./PatchMemoryText.xml.h"
+
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryText)
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryTextOut)
 
 REGISTER_PLUGIN( PatchMemoryText, L"SE PatchMemory Text2" );
 REGISTER_PLUGIN( PatchMemoryText, L"SE PatchMemory Text Out" );
-//REGISTER_XML( PATCHMEMORYTEXT_XML );
 
 PatchMemoryText::PatchMemoryText(IMpUnknown* host) : MpBase(host)
 {
@@ -11,7 +12,7 @@ PatchMemoryText::PatchMemoryText(IMpUnknown* host) : MpBase(host)
 	initializePin( 1, pinValueOut );
 }
 
-void PatchMemoryText::onSetPins(void)  // one or more pins_ updated.  Check pin update flags to determin which ones.
+void PatchMemoryText::onSetPins()  // one or more pins_ updated.  Check pin update flags to determin which ones.
 {
 	if( pinValueIn.isUpdated() )
 	{

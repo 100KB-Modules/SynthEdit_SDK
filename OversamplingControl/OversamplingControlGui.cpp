@@ -4,6 +4,7 @@ using namespace gmpi;
 using namespace gmpi_gui;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, OversamplingControlGui, L"SE Oversampling Control");
+SE_DECLARE_INIT_STATIC_FILE(OversamplingControl_Gui);
 
 OversamplingControlGui::OversamplingControlGui()
 {

@@ -127,7 +127,7 @@ class Jzone
 public:
 	genAmountType Get(int index);
 	void Set( sfInstGenList *igen );
-	void SetDefaults(void);
+	void SetDefaults();
 
 	short channel;
 	genAmountType value[NUM_SF_MODULATORS];
@@ -145,6 +145,7 @@ enum SF_Patch_Type{SFP_OK,SFP_EMPTY,SFP_ROM_SAMPLE};
 
 class CSoundFont
 {
+	static const int padSampleMemorybytes = 8; // 4 2-byte samples of padding for interpolator
 public:
 	CSoundFont();
 	 ~CSoundFont();
@@ -158,52 +159,49 @@ public:
 	void IntersectGenRange( sfGenList *pgen, int zone_lo,  std::vector<Jzone> & zone_list);
 
 	sfSample * GetSampleHeader(int id);
-	WORD * GetSampleChunk(void){return chunk_smpl;};
-	bool Load( gmpi::IProtectedFile* file );
-	int get_count_shdr(){return count_shdr;};
+	WORD* GetSampleChunk(){return chunk_smpl + padSampleMemorybytes / sizeof(*chunk_smpl);}
+	bool Load( gmpi::IProtectedFile2* file );
+	int get_count_shdr(){return count_shdr;}
 #if defined( _DEBUG )
 	void Dump(int type);
 #endif
-//	std::wstring GetFilename(){return filename_;};
 
 	// reference counting;
 	int AddRef()
 	{
 		return ++reference_count;
-	};
+	}
 	int Release()
 	{
 		int r = --reference_count;
 		if( reference_count == 0 )
 			delete this;
 		return r;
-	};
+	}
 
 private:
 	int reference_count;
 
-	unsigned int count_imod;
-	unsigned int count_ibag;
-	unsigned int count_inst;
-	unsigned int count_pgen;
-	unsigned int count_pbag;
-	unsigned int count_pmod;
-	unsigned int count_phdr;
-	unsigned int count_shdr;
-	unsigned int count_smpl;
-	unsigned int count_igen;
-	sfModList		* chunk_pmod;
-	sfInstBag		* chunk_ibag;
-	sfInst			* chunk_inst;
-	sfGenList		* chunk_pgen;
-	sfModList		* chunk_imod;
-	sfPresetBag		* chunk_pbag;
-	WORD			* chunk_smpl;
-	sfSample		* chunk_shdr;
-	sfPresetHeader	* chunk_phdr;
-	sfInstGenList	* chunk_igen;
-
-//	std::wstring filename_;
+	unsigned int count_imod = 0;
+	unsigned int count_ibag = 0;
+	unsigned int count_inst = 0;
+	unsigned int count_pgen = 0;
+	unsigned int count_pbag = 0;
+	unsigned int count_pmod = 0;
+	unsigned int count_phdr = 0;
+	unsigned int count_shdr = 0;
+	unsigned int count_smpl = 0;
+	unsigned int count_igen = 0;
+	sfModList		* chunk_pmod = {};
+	sfInstBag		* chunk_ibag = {};
+	sfInst			* chunk_inst = {};
+	sfGenList		* chunk_pgen = {};
+	sfModList		* chunk_imod = {};
+	sfPresetBag		* chunk_pbag = {};
+	WORD			* chunk_smpl = {};
+	sfSample		* chunk_shdr = {};
+	sfPresetHeader	* chunk_phdr = {};
+	sfInstGenList	* chunk_igen = {};
 };
 
 struct sf_chan_info
@@ -234,7 +232,7 @@ public:
 	{
 		return soundfont_->GetSampleHeader( id );
 	};
-	WORD* GetSampleChunk(void)
+	WORD* GetSampleChunk()
 	{
 		return soundfont_->GetSampleChunk();
 	};

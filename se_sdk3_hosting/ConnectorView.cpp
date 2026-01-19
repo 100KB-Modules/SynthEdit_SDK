@@ -2,6 +2,7 @@
 #include "ConnectorView.h"
 #include "ContainerView.h"
 #include "ModuleView.h"
+#include "ModuleViewStruct.h"
 #include "modules/shared/xplatform_modifier_keys.h"
 #include "modules/shared/VectorMath.h"
 
@@ -551,7 +552,7 @@ namespace SynthEdit2
 
 	int32_t PatchCableView::onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 	{
-		if (parent->getCapture()) // dragging?
+		if (imCaptured()) //parent->getCapture()) // dragging?
 		{
 			parent->releaseCapture();
 			parent->EndCableDrag(point, this);
@@ -609,7 +610,7 @@ namespace SynthEdit2
 
 	int32_t ConnectorViewBase::onPointerMove(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 	{
-		if (parent->getCapture())
+		if (imCaptured()) //parent->getCapture())
 		{
 			if (draggingFromEnd == 0)
 				from_ = point;
@@ -628,7 +629,7 @@ namespace SynthEdit2
 
 	int32_t ConnectorViewBase::onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 	{
-		if (parent->getCapture())
+		if (imCaptured()) //if (parent->getCapture())
 		{
 			// detect single clicks on pin, continue dragging.
 			const float dragThreshold = 6;

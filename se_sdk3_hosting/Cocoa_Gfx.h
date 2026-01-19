@@ -321,12 +321,10 @@ CG_AVAILABLE_STARTING(10.12, 10.0);
             }
 #endif
             {
-                auto temp = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
-                // auto temp = CGColorSpaceCreateWithName(kCGColorSpaceLinearSRGB); // no difference on big sur
+                // kCGColorSpaceExtendedLinearSRGB caused image to turn dark after intial draw on macOS Sequoia, like OS was compressing non-extended colors
+                // auto temp = CGColorSpaceCreateWithName(kCGColorSpaceExtendedLinearSRGB);
+                auto temp = CGColorSpaceCreateWithName(kCGColorSpaceLinearSRGB);
                 gmpiColorSpace = [[NSColorSpace alloc] initWithCGColorSpace:temp];
-                
-// no diff on big sur               CGContextRef ctx = (CGContextRef) [[NSGraphicsContext currentContext] graphicsPort];
-//                CGContextSetFillColorSpace(ctx, temp);
                 
                 if(temp)
                     CFRelease(temp);
@@ -1545,15 +1543,17 @@ return gmpi::MP_FAIL;
 			std::vector<GmpiDrawing_API::MP1_RECT> clipRectStack;
 			NSAffineTransform* currentTransform;
 			NSView* view_;
-            inline static int logicProFix = -1;
             
 		public:
-			GraphicsContext(NSView* pview, gmpi::cocoa::DrawingFactory* pfactory) :
+            inline static int logicProFix = -1;
+
+            GraphicsContext(NSView* pview, gmpi::cocoa::DrawingFactory* pfactory) :
 				factory(pfactory)
 				, view_(pview)
 			{
 				currentTransform = [NSAffineTransform transform];
-                
+ 
+#if 0
                 // no idea what the real cause is
                 if(logicProFix == -1) // -1 = not-set
                 {
@@ -1564,6 +1564,7 @@ return gmpi::MP_FAIL;
                     std::string pathstr{path, size};
                     logicProFix = pathstr.find("arrow.xpc") != std::string::npos;
                 }
+#endif
 			}
 
 			~GraphicsContext()
@@ -1795,6 +1796,8 @@ return gmpi::MP_FAIL;
                     {
                         macBaselineCorrection = winBaseline - baseline + textformat->baselineCorrection;
                     }
+                    
+ //                   _RPT3(0, "baseline %f, winBL %f, BLCorctn %f\n", baseline, winBaseline, textformat->baselineCorrection);
 #endif
                     
                     bounds.origin.y += macBaselineCorrection;
@@ -2176,7 +2179,7 @@ return gmpi::MP_FAIL;
 /*
             int getQuartzYorigin()
             {
-                const auto frameSize = [view_ frame];
+                const auto frameSize = [vi ew_ frame];
                 return frameSize.size.height;
             }
 

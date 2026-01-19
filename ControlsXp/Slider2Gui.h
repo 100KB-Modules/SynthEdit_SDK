@@ -1,11 +1,10 @@
-#ifndef SLIDERGUI_H_INCLUDED
-#define SLIDERGUI_H_INCLUDED
+#pragma once
 
 #include <algorithm>
 #include "../se_sdk3/mp_sdk_gui2.h"
 #include "../shared/ImageMetadata.h"
-#include "BitmapWidget.h"
-#include "EditWidget.h"
+#include "../sharedLegacyWidgets/BitmapWidget.h"
+#include "../sharedLegacyWidgets/EditWidget.h"
 
 class Slider2Gui : public gmpi_gui::MpGuiGfxBase
 {
@@ -54,7 +53,5 @@ private:
 	BoolGuiPin pinShowReadout;
 	IntGuiPin pinAppearance;
 };
-
-#endif
 
 

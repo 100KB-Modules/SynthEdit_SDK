@@ -22,6 +22,13 @@ m_prev_trigger(false)
 	initializePin( pinSaveMode);
 }
 
+std::string FileDialogGui::getDefaultFolder(std::wstring extension)
+{
+	const std::wstring searchFilename = L"dummy." + extension;
+	const auto fullFileName = uiHost.resolveFilename(searchFilename.c_str());
+	return JmUnicodeConversions::WStringToUtf8(fullFileName.substr(0, fullFileName.find(L"dummy") - 1));
+}
+
 void FileDialogGui::onSetTrigger()
 {
 	// trigger on mouse-up
@@ -38,11 +45,20 @@ void FileDialogGui::onSetTrigger()
 			int dialogMode = (int) pinSaveMode;
 			dialogHost->createFileDialog(dialogMode, nativeFileDialog.GetAddressOf());
 
-			if( ! nativeFileDialog.isNull() ) // returnFileDialog != 0 )
+			if( ! nativeFileDialog.isNull() )
 			{
 				nativeFileDialog.AddExtensionList(pinFileExtension);
 
-				nativeFileDialog.SetInitialFullPath(pinFileName);
+				auto filename = pinFileName.getValue();
+				if (!filename.empty())
+				{
+					filename = uiHost.resolveFilename(filename);
+					nativeFileDialog.SetInitialFullPath(JmUnicodeConversions::WStringToUtf8(filename));
+				}
+				else
+				{
+					nativeFileDialog.setInitialDirectory(getDefaultFolder(pinFileExtension));
+				}
 
 				nativeFileDialog.ShowAsync([this](int32_t result) -> void { this->OnFileDialogComplete(result); });
 			}
@@ -52,6 +68,34 @@ void FileDialogGui::onSetTrigger()
 	m_prev_trigger = pinTrigger;
 }
 
+std::string uniformPath(std::string path)
+{
+	std::string ret;
+
+	auto folderPath = path;
+
+	while (!folderPath.empty())
+	{
+		auto p = folderPath.find_last_of("\\/");
+
+		if (!ret.empty())
+			ret = '/' + ret;
+
+		if (p == std::string::npos)
+		{
+			ret = folderPath + ret;
+			folderPath.clear();
+		}
+		else
+		{
+			ret = std::string(folderPath.c_str() + p + 1) + ret;
+			folderPath = Left(folderPath, p);
+		}
+	}
+
+	return ret;
+}
+
 void FileDialogGui::OnFileDialogComplete(int32_t result)
 {
 	if (result == gmpi::MP_OK)
@@ -59,7 +103,7 @@ void FileDialogGui::OnFileDialogComplete(int32_t result)
 		// Trim filename if in default folder.
 		auto filepath = nativeFileDialog.GetSelectedFilename();
 		auto fileext = GetExtension(filepath);
-		char* fileclass = nullptr;
+		const char* fileclass = nullptr;
 
 		if (fileext == "sf2" || fileext == "sfz")
 		{
@@ -89,15 +133,69 @@ void FileDialogGui::OnFileDialogComplete(int32_t result)
 
 		if (fileclass)
 		{
-			auto shortName = StripPath(filepath);
+#if 0
+			// try to find a shorter filename that SynthEdit can find.
+			std::filesystem::path fullPath(filepath);
 
-			MpString r;
-			getHost()->FindResourceU(shortName.c_str(), fileclass, &r);
-
-			if (filepath == r.str())
+			std::vector<std::filesystem::path> pathParts;
+			for (auto p : fullPath)
 			{
-				filepath = shortName;
+				pathParts.push_back(p);
 			}
+
+			std::reverse(pathParts.begin(), pathParts.end());
+
+			std::filesystem::path shortName;
+			for (auto p : pathParts)
+			{
+				shortName = shortName.empty() ? p : p / shortName;
+
+				const std::filesystem::path r = uiHost.FindResourceU(shortName.string().c_str(), fileclass);
+				if (filepath == r)
+				{
+					filepath = shortName.string();
+					break;
+				}
+			}
+#else
+			auto folderPath = filepath;
+			std::vector<std::string> pathParts;
+
+			while (!folderPath.empty())
+			{
+				auto p = folderPath.find_last_of("\\/");
+
+				if (p == std::string::npos)
+				{
+					pathParts.push_back(folderPath);
+					folderPath.clear();
+				}
+				else
+				{
+					pathParts.push_back(std::string(folderPath.c_str() + p + 1));
+					folderPath = Left(folderPath, p);
+				}
+			}
+
+			// If root folder is a network location, ignore that
+			if (!pathParts.empty() && pathParts.back().find("\\\\") == 0)
+			{
+				pathParts.pop_back();
+			}
+
+			std::string shortName;
+			for (auto p : pathParts)
+			{
+				shortName = shortName.empty() ? p : p + '/' + shortName;
+
+				const std::string r = uiHost.FindResourceU(shortName.c_str(), fileclass);
+				if (uniformPath(filepath) == uniformPath(r))
+				{
+					filepath = shortName;
+					break;
+				}
+			}
+#endif
 		}
 
 		pinFileName = filepath;

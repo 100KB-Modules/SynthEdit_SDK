@@ -1,7 +1,7 @@
 #ifndef BOOLSTOINTGUI_H_INCLUDED
 #define BOOLSTOINTGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 #include <vector>
 
 class CommandTriggerGui : public MpGuiBase

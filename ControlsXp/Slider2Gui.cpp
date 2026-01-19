@@ -6,8 +6,7 @@
 #include <iomanip>
 #include "../shared/xplatform_modifier_keys.h"
 #include "../shared/unicode_conversion.h"
-
-std::wstring SliderFloatToString(float val, int p_decimal_places = -1); // defined in other slider.
+#include "./SliderGui.h"
 
 using namespace std;
 using namespace gmpi;
@@ -120,7 +119,7 @@ void Slider2Gui::onSetValueIn()
 
 void Slider2Gui::UpdateEditText()
 {
-	edit.SetText(WStringToUtf8(SliderFloatToString(pinValueIn)));
+	edit.SetText(WStringToUtf8(SliderGui::SliderFloatToString(pinValueIn)));
 
 	if( edit.ClearDirty() )
 		invalidateRect();

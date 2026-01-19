@@ -365,7 +365,7 @@ inline int extractControlID(char* p)
 	pColon = strchr(p,':');
 	if(!pColon) return -1; // no more
 
-	DWORD dEndIndex = strlen(p) - strlen(pColon);
+	auto dEndIndex = strlen(p) - strlen(pColon);
 
 	char* pID = new char[dEndIndex+1];
 	memset(pID,0,dEndIndex);
@@ -386,7 +386,7 @@ inline double extractControlValue(char* p)
 	pColon = strchr(p,':');
 	if(!pColon) return -1; // no more
 
-	DWORD dEndIndex = strlen(pColon);
+	auto dEndIndex = strlen(pColon);
 
 	char* pVal = new char[dEndIndex+1];
 	memset(pVal,0,dEndIndex);
@@ -427,8 +427,8 @@ const float METER_MIN_DB = -60.0;
 class CEnvelopeDetector
 {
 public:
-	CEnvelopeDetector(void);
-	~CEnvelopeDetector(void);
+	CEnvelopeDetector();
+	~CEnvelopeDetector();
 
 public:
 
@@ -484,8 +484,8 @@ protected:
 class CBiQuad
 {
 public:
-	CBiQuad(void);
-	virtual ~CBiQuad(void);
+	CBiQuad();
+	virtual ~CBiQuad();
 
 protected:
 	float m_f_Xz_1; // x z-1 delay element
@@ -545,7 +545,7 @@ public:	// Functions
 	CJoystickProgram(float* pJSProgramTable, UINT uMode);
 
 	// One Time Destruction
-	~CJoystickProgram(void);
+	~CJoystickProgram();
 
 	void startProgram();
 	void pauseProgram(){m_bRunning = false;}
@@ -616,7 +616,7 @@ public:	// Functions
 	CWaveTable();
 
 	// One Time Destruction
-	~CWaveTable(void);
+	~CWaveTable();
 
 	// The Prepare For Play Function is called just before audio streams
 	bool prepareForPlay();
@@ -713,7 +713,7 @@ public:	// Functions
 	bool initWithUserWAVFile(char* pInitDir = NULL);
 
 	// One Time Destruction
-	~CWaveData(void);
+	~CWaveData();
 
 	UINT m_uNumChannels;
 	UINT m_uSampleRate;
@@ -751,8 +751,8 @@ enum {csVU, csRed, csOrange, csYellow, csGreen, csBlue, csViolet};
 class CUICtrl
 {
 public:
-	CUICtrl(void);
-	~CUICtrl(void);
+	CUICtrl();
+	~CUICtrl();
 	CUICtrl(const CUICtrl& initCUICtrl);
 
 public:

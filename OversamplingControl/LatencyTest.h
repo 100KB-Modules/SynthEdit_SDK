@@ -9,7 +9,7 @@ class LatencyTest : public MpBase2
 public:
 	LatencyTest( );
 	void subProcess( int sampleFrames );
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 
 protected:
 	AudioInPin pinSignalIn;
@@ -42,7 +42,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
 		pinSignalOut.setStreaming(true);
 

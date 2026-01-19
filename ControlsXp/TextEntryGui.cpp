@@ -1,9 +1,9 @@
 #include "./TextEntryGui.h"
 #include <memory>
 #include "Drawing.h"
-#include "TextWidget.h"
-#include "TextEditWidget.h"
-#include "BitmapWidget.h"
+#include "../sharedLegacyWidgets/TextWidget.h"
+#include "../sharedLegacyWidgets/TextEditWidget.h"
+#include "../sharedLegacyWidgets/BitmapWidget.h"
 
 using namespace std;
 using namespace gmpi;
@@ -31,10 +31,31 @@ void TextEntryGui::OnPopupmenuComplete(int32_t result)
 {
 	if (result == gmpi::MP_OK)
 	{
-		OnWidgetUpdate(nativeFileDialog.GetSelectedFilename());
+		// strip off path (or part of), if it's the default path
+		std::string returnValue = nativeFileDialog.GetSelectedFilename();
+		std::wstring fileextension = pinExtension;
+		if (auto dotPos = returnValue.find_last_of('.') ; dotPos != std::string::npos)
+		{
+			fileextension = JmUnicodeConversions::Utf8ToWstring(returnValue.substr(dotPos + 1));
+		}
+
+		auto defaultPath = getDefaultFolder(fileextension);
+		if (returnValue.find(defaultPath) == 0 && returnValue.size() >= defaultPath.size() + 1)
+		{
+			returnValue = returnValue.substr(defaultPath.size() + 1);
+		}
+
+		OnWidgetUpdate(returnValue);
 	}
 
 	nativeFileDialog.setNull(); // release it.
+}
+
+std::string TextEntryGui::getDefaultFolder(std::wstring extension)
+{
+	const std::wstring searchFilename = L"dummy." + extension;
+	const auto fullFileName = uiHost.resolveFilename(searchFilename.c_str());
+	return JmUnicodeConversions::WStringToUtf8(fullFileName.substr(0, fullFileName.find(L"dummy") - 1));
 }
 
 void TextEntryGui::OnBrowseButton(float newvalue)
@@ -45,7 +66,21 @@ void TextEntryGui::OnBrowseButton(float newvalue)
 		nativeFileDialog = host.createFileDialog();
 
 		nativeFileDialog.AddExtensionList(pinExtension);
-		nativeFileDialog.SetInitialFullPath(pinpatchValue);
+
+		// caclulate initial directory from file extension, or use default.
+		{
+			auto filename = pinpatchValue.getValue();
+
+			if (!filename.empty())
+			{
+				filename = uiHost.resolveFilename(filename);
+				nativeFileDialog.SetInitialFullPath(JmUnicodeConversions::WStringToUtf8(filename));
+			}
+			else
+			{
+				nativeFileDialog.setInitialDirectory(getDefaultFolder(pinExtension));
+			}
+		}
 
 		nativeFileDialog.ShowAsync( [this](int32_t result) -> void { this->OnPopupmenuComplete(result); } );
 	}
@@ -79,20 +114,17 @@ void TextEntryGui::onSetExtension()
 	if (!pinExtension.getValue().empty())
 	{
 		auto bm = make_shared<BitmapWidget>(getHost(), "browse");
-//		bm->SetToggle(false);
 		bm->OnChangedEvent = [this](float newvalue) -> void { this->OnBrowseButton(newvalue); };
 
 		widgets.push_back(bm);
 	}
 
 	auto title = (std::string) pinTitle;
-	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str());
-	tw->setCentered();
+	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str(), !useBackwardCompatibleArrangement());
 	widgets.push_back(tw);
 
 	onSetpatchValue();
 
-	//if (isarranged)
 	getGuiHost()->invalidateMeasure();
 }
 

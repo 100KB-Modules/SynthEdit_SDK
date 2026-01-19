@@ -1,6 +1,7 @@
 #include "PatchMemoryBoolOutGui.h"
 
 REGISTER_GUI_PLUGIN( PatchMemoryBoolOutGui, L"SE PatchMemory Bool Out" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryBoolOut_Gui);
 
 // handy macro to save typing.
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryBoolOutGui::on##name##Changed ) );

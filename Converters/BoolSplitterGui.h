@@ -12,13 +12,11 @@ class BoolSplitterGui : public MpGuiBase
 public:
 	BoolSplitterGui( IMpUnknown* host );
 	virtual int32_t MP_STDCALL initialize() override;
-//	virtual int32_t MP_STDCALL notifyPin(int32_t pinId, int32_t voice);
 	virtual int32_t MP_STDCALL setPin(int32_t pinId, int32_t voice, int32_t size, void* data) override;
 
 private:
  	void onSetOutput();
  	BoolGuiPin pinOut;
- //	std::vector<BoolGuiPin> pinIns;
 };
 
 template<class T>
@@ -43,17 +41,16 @@ public:
 			*p = pinOut;
 		}
 	}
-	virtual int32_t MP_STDCALL setPin(int32_t pinId, int32_t voice, int32_t size, const void* data) override
+	int32_t MP_STDCALL setPin(int32_t pinId, int32_t voice, int32_t size, const void* data) override
 	{
 		int plugIndex = pinId - fixedPinCount; // Calc index of autoduplicating pin.
 
 		// Add autoduplicate pins as needed.
 		while( (int) pinIns.size() < plugIndex + 1 )
 		{
-			const int pinId = pinIns.size() + fixedPinCount;
 			pinIns.push_back(std::make_unique< MpGuiPin<T> >());
-			initializePin(pinId, *pinIns.back());
-			autoPinCount = pinIns.size();
+			initializePin(*pinIns.back());
+			autoPinCount = static_cast<int>(pinIns.size());
 		}
 
 		auto result = MpGuiBase2::setPin(pinId, voice, size, data);

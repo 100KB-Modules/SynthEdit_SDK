@@ -8,7 +8,7 @@ TextEntry::TextEntry( )
 	initializePin( pinTextOut );
 }
 
-void TextEntry::onSetPins(void)
+void TextEntry::onSetPins()
 {
 	pinTextOut = pinpatchValue;
 }

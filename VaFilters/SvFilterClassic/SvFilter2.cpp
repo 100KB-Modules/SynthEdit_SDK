@@ -1,4 +1,5 @@
 #include "./SvFilter2.h"
+#include <mutex>
 
 REGISTER_PLUGIN2( SvFilter2, L"SE SV Filter2" );
 
@@ -24,6 +25,10 @@ void SvFilter2::initializePins()
 int32_t SvFilter2::open()
 {
 	initializePins();
+
+	// fix for race conditions.
+	static std::mutex safeInit;
+	std::lock_guard<std::mutex> lock(safeInit);
 
 	// 20kHz is about 10.5 Volts. 1Hz is about -3.7 volts. 0.01Hz = -10V
 	// -4 -> 11 Volts should cover most posibilities. 15V Range. 12 entries per volt = 180 entries.
@@ -67,12 +72,13 @@ int32_t SvFilter2::open()
 	return FilterBase::open();
 }
 
-void SvFilter2::onSetPins(void)
+void SvFilter2::onSetPins()
 {
 	// Check which pins are updated.
 	if (pinResonance.isUpdated() && !pinResonance.isStreaming())
 	{
 		ResonanceFixed::CalcInitial(stabilityTable, pinResonance, maxStableF1, quality);
+		f1 = (std::min)(f1, maxStableF1);
 	}
 
 	if (pinPitch.isUpdated() && !pinPitch.isStreaming())
@@ -205,13 +211,11 @@ void SvFilter2::ChoseProcessMethod()
 // periodic check/correct for numeric overflow
 void SvFilter2::StabilityCheck()
 {
-	if( ! isfinite( low_pass1 ) ) // overload?
+	for (auto* state : { &low_pass1, &band_pass1, &low_pass2, &band_pass2 })
 	{
-		low_pass1 = 0.f;
-	}
-
-	if( ! isfinite( band_pass1 ) ) // overload?
-	{
-		band_pass1 = 0.f;
+		if (isnan(*state) || !isfinite(*state)) // overload?
+		{
+			*state = 0.f;
+		}
 	}
 }

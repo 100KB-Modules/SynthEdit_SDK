@@ -5,10 +5,11 @@
 
 class GuiComTest2 : public MpBase
 {
+	int clickCount = 0;
 public:
 	GuiComTest2( IMpUnknown* host );
-	virtual void onSetPins(void);
-	virtual int32_t MP_STDCALL recieveMessageFromGui( int32_t id, int32_t size, void* messageData );
+	void onSetPins(void) override;
+	int32_t MP_STDCALL receiveMessageFromGui( int32_t id, int32_t size, const void* messageData ) override;
 
 private:
 	AudioInPin pinIn;

@@ -22,7 +22,7 @@ int32_t LadderFilter::open()
 	return MpBase2::open();
 }
 
-void LadderFilter::onSetPins(void)
+void LadderFilter::onSetPins()
 {
 	// Check which pins are updated.
 	if( pinSignal.isStreaming() )
@@ -52,6 +52,16 @@ void LadderFilter::onSetPins(void)
 
 	// Set sleep mode (optional).
 	// setSleep(false);
+	
+	initSettling(); // must be last.
+}
+
+void LadderFilter::StabilityCheck()
+{
+	if (!filter.isStable())
+	{
+		filter.initialize(getSampleRate());
+	}
 }
 
 LadderFilter_test::LadderFilter_test()
@@ -96,7 +106,7 @@ void LadderFilter_test::subProcess(int sampleFrames)
 	}
 }
 
-void LadderFilter_test::onSetPins(void)
+void LadderFilter_test::onSetPins()
 {
 	// Set state of output audio pins.
 	pinOutput.setStreaming(true);

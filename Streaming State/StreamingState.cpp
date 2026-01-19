@@ -7,34 +7,28 @@ StreamingState::StreamingState( IMpUnknown* host ) : MpBase( host )
 	// Register pins.
 	initializePin( 0, pinSignalIn );
 	initializePin( 1, pinSignalOut );
+
+	pinSignalOut.setTransitionTime(1.0f);
 }
 
 void StreamingState::subProcess( int bufferOffset, int sampleFrames )
 {
-	float* signalOut = bufferOffset + pinSignalOut.getBuffer();
-	float state = (float) pinSignalIn.isStreaming();
-
-	for( int s = sampleFrames; s > 0; --s )
-	{
-		*signalOut = output_;
-		++signalOut;
-
-		if( output_ != state )
-		{
-			output_ = state;
-			pinSignalOut.setStreaming(false, bufferOffset + sampleFrames - s );
-		}
-	}
+	bool canSleep = true;
+	pinSignalOut.subProcess(bufferOffset, sampleFrames, canSleep);
 }
 
-void StreamingState::onSetPins(void)
+void StreamingState::onSetPins()
 {
-	// Set state of output audio pins.
-	pinSignalOut.setStreaming(false);
-
-	if( pinSignalIn.isUpdated() && !pinSignalIn.isStreaming() )
+	if (pinSignalIn.isUpdated())
 	{
-		output_ = 0.5f;
+		if (pinSignalIn.isStreaming())
+		{
+			pinSignalOut.setValueInstant(1.0f);
+		}
+		else
+		{
+			pinSignalOut.pulse(0.5f);
+		}
 	}
 
 	// Set processing method.

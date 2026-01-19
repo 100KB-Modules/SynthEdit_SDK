@@ -5,9 +5,9 @@
 #include "Drawing.h"
 #include <iomanip>
 #include <sstream>
-#include "WidgetHost.h"
-#include "EditWidget.h"
-#include "TextWidget.h"
+#include "../sharedLegacyWidgets/WidgetHost.h"
+#include "../sharedLegacyWidgets/EditWidget.h"
+#include "../sharedLegacyWidgets/TextWidget.h"
 
 using namespace std;
 using namespace gmpi;
@@ -21,7 +21,7 @@ class SeWaveshaperGuiBase : public gmpi_gui::MpGuiGfxBase, public FontCacheClien
 protected:
 	StringGuiPin pinShape;
 	GmpiDrawing::TextFormat dtextFormat;
-	FontMetadata* typeface_;
+	FontMetadata* typeface_ = nullptr;
 
 public:
 	void DrawScale(Graphics g)
@@ -127,95 +127,10 @@ public:
 	}
 };
 
-/*
-class SeWaveshaper2XpGui : public SeWaveshaperGuiBase
-{
-	const int WS_NODE_COUNT = 11;
-
- 	void onSetShape()
-	{
-		invalidateRect();
-	}
-
-public:
-	SeWaveshaper2XpGui()
-	{
-		initializePin( pinShape, static_cast<MpGuiBaseMemberPtr2>(&SeWaveshaper2XpGui::onSetShape) );
-	}
-
-	int32_t MP_STDCALL initialize() override
-	{
-		dtextFormat = GetTextFormat(getHost(), getGuiHost(), "tty", &typeface_);
-
-		dtextFormat.SetTextAlignment(TextAlignment::Leading); // Left
-		dtextFormat.SetParagraphAlignment(ParagraphAlignment::Center);
-		dtextFormat.SetWordWrapping(WordWrapping::NoWrap); // prevent word wrapping into two lines that don't fit box.
-
-		return MpGuiGfxBase::initialize();
-	}
-
-	int32_t MP_STDCALL OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext) override
-	{
-		Graphics g(drawingContext);
-
-		auto r2 = getRect();
-		g.PushAxisAlignedClip(r2);
-
-		DrawScale(g);
-
-		float vscale = r2.getHeight() * 0.01f / scaleFactorB;
-		float hscale = r2.getWidth() * 0.01f / scaleFactorB;
-		int mid_x = r2.getWidth() / 2;
-		int mid_y = r2.getHeight() / 2;
-
-		auto brush = g.CreateSolidColorBrush(Color::FromArgb(0xFF00FF00));
-
-		Evaluator ee;
-		auto formula_ascii = JmUnicodeConversions::WStringToUtf8(pinShape.getValue());
-
-		int flags = 0;
-
-		const float ten_over_scale = 10.f / r2.getWidth();
-
-		auto geometry = g.GetFactory().CreatePathGeometry();
-		auto sink = geometry.Open();
-
-		for (int x = 0; x < r2.getWidth(); x++)
-		{
-			double xf = ten_over_scale * (float)(x - mid_x);
-			ee.SetValue("x", &xf);
-			double yf;
-			ee.Evaluate(formula_ascii.c_str(), &yf, &flags);
-			if (_isnan(yf))
-			{
-				yf = 0.0;
-			}
-
-			yf = mid_y - 10.0f * yf * vscale; // 0.1 * yf * r2.getHeight() / scaleFactorB;
-
-			if (x == 0)
-			{
-				sink.BeginFigure(x, yf);
-			}
-			else
-			{
-				sink.AddLine(GmpiDrawing::Point(x, yf));
-			}
-		}
-		sink.EndFigure(FigureEnd::Open);
-		sink.Close();
-
-		g.DrawGeometry(geometry, brush, 1.0f);
-		
-		g.PopAxisAlignedClip();
-		return MP_OK;
-	}
-};
-*/
 class SeWaveshaper3XpGui : public SeWaveshaperGuiBase
 {
-	const static int WS_NODE_COUNT = 11;
-	const static int NODE_SIZE = 6;
+	static const int WS_NODE_COUNT = 11;
+	static const int NODE_SIZE = 6;
 	Point nodes[WS_NODE_COUNT]; // x,y co-ords of control points
 	Point m_ptPrev;
 	int drag_node;
@@ -407,11 +322,28 @@ public:
 
 	int32_t MP_STDCALL initialize() override
 	{
-		dtextFormat = GetTextFormat(getHost(), getGuiHost(), "tty", &typeface_);
+		// Create a custom, cached, TextFormat based on the "tty" Style.
+		const char* style = "tty";
+		const char* customStyleName = "Waveshaper3:text";
+		if (!TextFormatExists(getHost(), getGuiHost(), customStyleName))
+		{
+			// Get the specified font style.
+			FontMetadata* fontmetadata = nullptr;
+			GetTextFormat(getHost(), getGuiHost(), style, &fontmetadata);
 
-		dtextFormat.SetTextAlignment(TextAlignment::Leading); // Left
-		dtextFormat.SetParagraphAlignment(ParagraphAlignment::Center);
-		dtextFormat.SetWordWrapping(WordWrapping::NoWrap); // prevent word wrapping into two lines that don't fit box.
+			auto textFormat = AddCustomTextFormat(getHost(), getGuiHost(), customStyleName, fontmetadata);
+
+			// Apply customisation.
+			textFormat.SetTextAlignment(TextAlignment::Leading); // Left
+			textFormat.SetParagraphAlignment(ParagraphAlignment::Center);
+			textFormat.SetWordWrapping(WordWrapping::NoWrap); // prevent word wrapping into two lines that don't fit box.
+		}
+
+		// retrieve cached font data (color etc).
+		auto textFormat_readonly = GetTextFormat(getHost(), getGuiHost(), customStyleName, &typeface_);
+		// convert to mutable (so we can change alignment while drawing).
+		*dtextFormat.GetAddressOf() = textFormat_readonly.Get();
+		dtextFormat.Get()->addRef();
 
 		return MpGuiGfxBase::initialize();
 	}
@@ -430,7 +362,8 @@ public:
 	void DrawScale(Graphics g)
 	{
 		FontMetadata* typeface = nullptr;
-		auto dtextFormat = GetTextFormat(patchMemoryHost_, guiHost_, "tty", &typeface);
+		GetTextFormat(patchMemoryHost_, guiHost_, "tty", &typeface); // get ttyp font color etc (ignore actual font becuase we need to create a custom one to modify_
+		auto dtextFormat = g.GetFactory().CreateTextFormat(10);
 
 		const float snapToPixelOffset = 0.5f;
 
@@ -531,7 +464,8 @@ public:
 			}
 		}
 	}
-	virtual void OnRender(GmpiDrawing::Graphics& g) override
+
+	void OnRender(GmpiDrawing::Graphics& g) override
 	{
 		const auto originalTransform = g.GetTransform();
 		auto adjustedTransform = Matrix3x2::Translation(position.left, position.top) * originalTransform;
@@ -565,7 +499,7 @@ public:
 			ee.SetValue("x", &xf);
 			double yf;
 			ee.Evaluate(formula_ascii.c_str(), &yf, &flags);
-			if (_isnan(yf))
+			if (isnan(yf))
 			{
 				yf = 0.0;
 			}
@@ -667,7 +601,7 @@ public:
 		e->Init("control_edit");
 		e->SetText(pinShape);
 
-		header->Init("control_label");
+		header->Init("control_label", true);
 
 		onSetShape();
 
@@ -715,8 +649,14 @@ private:
 
 	void onSetShape()
 	{
-		if( widgets.size() > 0 )
-			dynamic_cast<WsGraphWidget*>(widgets[1].get())->shape = JmUnicodeConversions::WStringToUtf8(pinShape.getValue());
+		if (widgets.size() > 0)
+		{
+			const auto textU = JmUnicodeConversions::WStringToUtf8(pinShape.getValue());
+			dynamic_cast<WsGraphWidget*>(widgets[1].get())->shape = textU;
+			dynamic_cast<EditWidget*>(widgets[2].get())->SetText(textU);
+		}
+
+        invalidateRect(); // required on mac because update is async
 	}
 
 	StringGuiPin pinShape;

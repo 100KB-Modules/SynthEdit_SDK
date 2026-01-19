@@ -23,6 +23,8 @@ public:
 	IntGuiPin		pinMenuSelection;
 	BoolGuiPin		pinMouseDown;
 
+	bool inhibitFeedback = {};
+
 private:
 	void onValueInChanged();
 	void onValueChanged();

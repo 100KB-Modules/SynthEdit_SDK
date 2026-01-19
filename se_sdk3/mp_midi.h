@@ -825,6 +825,7 @@ namespace gmpi
 				{
 					if (noteIds[i].noteId == noteId)
 					{
+						// _RPTN(0, "MPE found note %d\n", i);
 						return &noteIds[i];
 					}
 				}
@@ -931,7 +932,7 @@ namespace gmpi
 		// Convert MIDI 1.0 to MIDI 2.0
 		class MidiConverter2
 		{
-			std::function<void(const midi::message_view, int timestamp)> sink;
+			std::function<void(const midi::message_view, int timestamp)> sink_;
 
 			// RPN
 			unsigned short incoming_rpn[16] = {};
@@ -950,13 +951,18 @@ namespace gmpi
 
 		public:
 			MidiConverter2(std::function<void(const midi::message_view, int)> psink) :
-				sink(psink)
+				sink_(psink)
 			{
 				std::fill(std::begin(incoming_rpn), std::end(incoming_rpn), NULL_RPN);
 				std::fill(std::begin(incoming_nrpn), std::end(incoming_nrpn), NULL_RPN);
 			}
 
 			void processMidi(const midi::message_view msg, int timestamp)
+			{
+				processMidi(msg, timestamp, sink_);
+			}
+
+			void processMidi(const midi::message_view msg, int timestamp, std::function<void(const midi::message_view, int timestamp)> sink)
 			{
 				// MIDI 2.0 messages need no conversion
 				if (gmpi::midi_2_0::isMidi2Message(msg))
@@ -1180,7 +1186,7 @@ namespace gmpi
 
 			void setSink(std::function<void(const midi::message_view, int)> psink)
 			{
-				sink = psink;
+				sink_ = psink;
 			}
 		};
 
@@ -1239,10 +1245,10 @@ namespace gmpi
 					const auto MpeId = note.noteNumber | (header.channel << 7);
 					auto& keyInfo = allocateNote(MpeId, note.noteNumber);
 
-					//			_RPTN(0, "MPE Note-on %d => %d\n", note.noteNumber, keyInfo.MidiKeyNumber);
+					// _RPTN(0, "MPE Note-on %d => %d\n", note.noteNumber, keyInfo.MidiKeyNumber);
 
-					// MIDI 2.0 does not automatically reset per-note controls. MPE is expected to.
-					// reset per-note bender
+					// Values for per-note controls	must be tracked and stored on all Member Channels,
+					// even when no note is playing, to provide an initial state for a new note
 					{
 						const auto msgout = gmpi::midi_2_0::makePolyBender(
 							keyInfo.MidiKeyNumber,
@@ -1315,6 +1321,9 @@ namespace gmpi
 				{
 					auto note = midi_1_0::decodeNote(msg);
 					const auto MpeId = note.noteNumber | (header.channel << 7);
+
+					// _RPTN(0, "MPE Note-off %d\n", note.noteNumber);
+
 					auto keyInfo = findNote(MpeId);
 
 					if (keyInfo)
@@ -1326,7 +1335,6 @@ namespace gmpi
 							note.velocity
 						);
 
-						//pinMIDIOut.send(out.begin(), out.size());
 						sink({ msgout.m }, timestamp);
 					}
 				}
@@ -1719,7 +1727,7 @@ namespace gmpi
 		// Convert MIDI 2.0 to MIDI 1.0
 		class MidiConverter1
 		{
-			std::function<void(const midi::message_view, int timestamp)> sink;
+			std::function<void(const midi::message_view, int timestamp)> sink_;
 			float midi2NoteTune[256];
 			uint8_t midi2NoteToKey[256];
 
@@ -1732,7 +1740,7 @@ namespace gmpi
 
 		public:
 			MidiConverter1(std::function<void(const midi::message_view, int)> psink) :
-				sink(psink)
+				sink_(psink)
 			{
 				for (size_t i = 0; i < std::size(midi2NoteToKey); ++i)
 				{
@@ -1749,6 +1757,11 @@ namespace gmpi
 			}
 
 			void processMidi(const midi::message_view msg, int timestamp)
+			{
+				processMidi(msg, timestamp, sink_);
+			}
+			
+			void processMidi(const midi::message_view msg, int timestamp, std::function<void(const midi::message_view, int timestamp)> sink)
 			{
 				// MIDI 1.0 messages need no conversion
 				if (!gmpi::midi_2_0::isMidi2Message(msg))

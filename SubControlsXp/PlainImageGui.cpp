@@ -7,6 +7,9 @@ using namespace gmpi;
 using namespace GmpiDrawing;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, PlainImageGui, L"SE Plain Image" );
+SE_DECLARE_INIT_STATIC_FILE(PlainImage_Gui);
+
+#define USE_BITMAP_BRUSH 1
 
 PlainImageGui::PlainImageGui()
 {
@@ -17,26 +20,55 @@ PlainImageGui::PlainImageGui()
 
 void PlainImageGui::onSetFilename()
 {
-	string filename = pinFilename;
+	bitmap_ = nullptr;
 
-	auto bitmap = GetImage(getHost(), getGuiHost(), filename.c_str(), &bitmapMetadata_);
-
-	switch (pinStretchMode)
+	if ((int)StretchMode::Tiled != pinStretchMode.getValue() || USE_BITMAP_BRUSH)
 	{
-	case (int)StretchMode::Fixed:
-	{
-		bitmap_ = bitmap;
+		const string filename = pinFilename;
+		bitmap_ = GetImage(getHost(), getGuiHost(), filename.c_str(), &bitmapMetadata_);
 	}
-	break;
 
-	case (int)StretchMode::Tiled:
+	invalidateMeasure();
+	invalidateRect();
+}
+
+void PlainImageGui::onSetMode()
+{
+	invalidateMeasure();
+}
+
+int32_t PlainImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
+{
+#if 0 // dead code
+	// Create tiled image (need to be arranged first in order to know module dimensions).
+	if (bitmap_.isNull() && !USE_BITMAP_BRUSH)
 	{
+		if ((int)StretchMode::Tiled != pinStretchMode.getValue())
+		{
+			return MP_FAIL;
+		}
+
+		const string filename = pinFilename;
+		auto bitmap = GetImage(getHost(), getGuiHost(), filename.c_str(), &bitmapMetadata_);
+
+		if (bitmap.isNull())
+		{
+			return MP_FAIL;
+		}
+
 		auto moduleRect = getRect();
 		auto sourceSize = bitmap.GetSize();
 		RectL bitmapRect(0, 0, sourceSize.width, sourceSize.height);
-		SizeU destSize(static_cast<int32_t>(moduleRect.getWidth()), static_cast<int32_t>(moduleRect.getHeight()));
+		SizeU destSize(
+			(std::max)(1, static_cast<int32_t>(moduleRect.getWidth())),
+			(std::max)(1, static_cast<int32_t>(moduleRect.getHeight())));
 
 		bitmap_ = GetGraphicsFactory().CreateImage(destSize);
+
+		if (bitmap_.isNull()) // can fail if dimensions are too big.
+		{
+			return MP_FAIL;
+		}
 
 		auto pixelsSource = bitmap.lockPixels();
 		auto pixelsDest = bitmap_.lockPixels(GmpiDrawing_API::MP1_BITMAP_LOCK_WRITE);
@@ -56,26 +88,21 @@ void PlainImageGui::onSetFilename()
 				}
 			}
 		}
+        
+        pixelsDest.setPixel(0, 0, 0x00ff00ff);
 	}
-	break;
-	};
-
-	invalidateMeasure();
-}
-
-void PlainImageGui::onSetMode()
-{
-	invalidateMeasure();
-}
-
-int32_t PlainImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
-{
-	if (bitmap_.isNull())
-		return MP_FAIL;
-
-	Graphics dc(drawingContext);
-
+#endif
+	
+	Graphics g(drawingContext);
 	auto moduleRect = getRect();
+
+	if(bitmap_.isNull())
+	{
+		auto fallbackBrush = g.CreateSolidColorBrush(Color::Gray);
+		g.FillRectangle(moduleRect, fallbackBrush);
+		return MP_OK;
+	}
+
 	auto bitmapSize = bitmap_.GetSize();
 	Rect bitmapRect(0, 0, static_cast<float>(bitmapSize.width), static_cast<float>(bitmapSize.height));
 
@@ -85,15 +112,23 @@ int32_t PlainImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContex
 		{
 			bitmapRect.right = (std::min)(bitmapRect.right, moduleRect.right);
 			bitmapRect.bottom = (std::min)(bitmapRect.bottom, moduleRect.bottom);
-			dc.DrawBitmap(bitmap_, bitmapRect,  bitmapRect);
+			g.DrawBitmap(bitmap_, bitmapRect,  bitmapRect);
 		}
 		break;
 
 		case (int)StretchMode::Tiled:
 		{
-			bitmapRect.right = (std::min)(bitmapRect.right, moduleRect.right);
-			bitmapRect.bottom = (std::min)(bitmapRect.bottom, moduleRect.bottom);
-			dc.DrawBitmap(bitmap_, bitmapRect, bitmapRect);
+			if(USE_BITMAP_BRUSH)
+			{
+				auto brush = g.CreateBitmapBrush(bitmap_);
+				g.FillRectangle(moduleRect, brush);
+			}
+			else
+			{
+				bitmapRect.right = (std::min)(bitmapRect.right, moduleRect.right);
+				bitmapRect.bottom = (std::min)(bitmapRect.bottom, moduleRect.bottom);
+				g.DrawBitmap(bitmap_, bitmapRect, bitmapRect);
+			}
 		}
 /* old, drew faint lines at joins on certain DPI settings
 		{
@@ -114,7 +149,7 @@ int32_t PlainImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContex
 		break;
 
 	case (int)StretchMode::Stretch:
-		dc.DrawBitmap(bitmap_, moduleRect,  bitmapRect);
+		g.DrawBitmap(bitmap_, moduleRect,  bitmapRect);
 		break;
 	}
 

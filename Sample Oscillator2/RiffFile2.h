@@ -32,37 +32,37 @@ public:
 	// there as a check that the the chunk is an exact multiple of 'size' big
 	struct riff_match
 	{
-		riff_match(){};
-		riff_match(	std::string n, char *fct, char *cid, char **ad, unsigned int * ca,int size, int *file_offs = NULL) :
+		riff_match() {}
+		riff_match(	std::string n, const char *fct, const char *cid, char **ad, unsigned int * ca,int size, int *file_offs = nullptr, int padding = 0) :
 			name(n)
 			,addr(ad)
 			,count_addr(ca)
 			,item_size(size)
-//			,file_offset(file_offs)
+			,padMemoryAllocationBytes(padding)
+			,fccType(MAKEFOURCC(fct[0], fct[1], fct[2], fct[3]))
+			,ckid(MAKEFOURCC(cid[0], cid[1], cid[2], cid[3]))
 			{
-				fccType = MAKEFOURCC(fct[0], fct[1], fct[2], fct[3]);
-				ckid	= MAKEFOURCC(cid[0], cid[1], cid[2], cid[3]);
 			};
 
 		std::string	name;
-		uint32_t	fccType;
-		uint32_t	ckid;
-		char **	addr;
-		uint32_t* count_addr;	// *int in which to store item count
-		int		item_size;
-//		int	*file_offset;
+		uint32_t	fccType = 0;
+		uint32_t	ckid = 0;
+		char** addr = {};
+		uint32_t* count_addr = {};	// *int in which to store item count
+		int		item_size = 0;
+		int padMemoryAllocationBytes = 0; // add extra blank data before and after for safety.
 	};
 
 	RiffFile2();
-	bool ReadFile(void);
+	bool ReadFile();
 	void AddChunk( riff_match riff_desc );
-	bool Open( gmpi::IProtectedFile* file, uint32_t& riff_type );
+	bool Open( gmpi::IProtectedFile2* file, uint32_t& riff_type );
 
 private:
 	bool Open2(uint32_t& riff_type);
-	gmpi::IProtectedFile* fileHandle;
-	int32_t filePos;
+	gmpi::IProtectedFile2* fileHandle;
+	int32_t filePos = 0;
 	std::vector<riff_match> rec_chunks;
 	int level; //current indent level
-	MMCKINFO_SE cnk[30];
+	MMCKINFO_SE cnk[30] = {};
 };

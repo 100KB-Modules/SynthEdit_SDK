@@ -1,7 +1,7 @@
 #ifndef DBTOANIMATIONGUI_H_INCLUDED
 #define DBTOANIMATIONGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 
 class DbToAnimationGui : public MpGuiBase
 {

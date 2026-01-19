@@ -5,6 +5,9 @@
 #include "PatchMemoryFloatGui.h"
 
 REGISTER_GUI_PLUGIN( PatchMemoryFloatGui, L"SE PatchMemory Float" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryFloat_Gui);
+REGISTER_GUI_PLUGIN(PatchMemoryFloatGui, L"SE PatchMemory Float Latchable");
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryFloatLatchable_Gui);
 
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryFloatGui::on##name##Changed ) );
 

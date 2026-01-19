@@ -11,7 +11,7 @@
 
 // CEnvelopeDetector Implementation ----------------------------------------------------------------
 //
-CEnvelopeDetector::CEnvelopeDetector(void)
+CEnvelopeDetector::CEnvelopeDetector()
 {
 	m_fAttackTime_mSec = 0.0;
 	m_fReleaseTime_mSec = 0.0;
@@ -25,7 +25,7 @@ CEnvelopeDetector::CEnvelopeDetector(void)
 	m_bLogDetector = false;
 }
 
-CEnvelopeDetector::~CEnvelopeDetector(void)
+CEnvelopeDetector::~CEnvelopeDetector()
 {
 }
 
@@ -257,7 +257,7 @@ CWaveTable::CWaveTable()
 	Destroy variables allocated in the contructor()
 
 */
-CWaveTable::~CWaveTable(void)
+CWaveTable::~CWaveTable()
 {
 
 
@@ -385,11 +385,11 @@ void CWaveTable::doOscillate(float* pYn, float* pYqn)
 
 // CBiQuad Implementation ----------------------------------------------------------------
 //
-CBiQuad::CBiQuad(void)
+CBiQuad::CBiQuad()
 {
 }
 
-CBiQuad::~CBiQuad(void)
+CBiQuad::~CBiQuad()
 {
 }
 
@@ -424,7 +424,7 @@ void CJoystickProgram::setSampleRate(int nSampleRate)
 	m_fSampleRate = (float)nSampleRate;
 }
 
-CJoystickProgram::~CJoystickProgram(void)
+CJoystickProgram::~CJoystickProgram()
 {
 
 }
@@ -1289,7 +1289,7 @@ return false;
 
 
 // UI CONTROL CLASS -- DO NOT DELETE
-CUICtrl::CUICtrl(void)
+CUICtrl::CUICtrl()
 {
 	m_pUserCookedIntData = NULL;
 	m_pUserCookedFloatData = NULL;
@@ -1424,7 +1424,7 @@ CUICtrl::CUICtrl(const CUICtrl& initCUICtrl)
 	cMeterVariableName[1023] = '\0';
 }
 
-CUICtrl::~CUICtrl(void)
+CUICtrl::~CUICtrl()
 {
 
 }

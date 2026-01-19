@@ -5,6 +5,7 @@
 #include "ViewBase.h"
 #include "ConnectorView.h"
 #include "ConnectorViewStruct.h"
+#include "ModuleViewStruct.h"
 #include "modules/se_sdk3_hosting/Presenter.h"
 #include "ResizeAdorner.h"
 #include "GuiPatchAutomator3.h"
@@ -505,7 +506,11 @@ namespace SynthEdit2
 	int32_t ViewBase::releaseCapture()
 	{
 		mouseCaptureObject = nullptr;
-		return getGuiHost()->releaseCapture();
+		auto r = getGuiHost()->releaseCapture();
+
+		calcMouseOverObject(0);
+
+		return r;
 	}
 
 	int32_t ViewBase::getToolTip(MP1_POINT point, gmpi::IString* returnString)
@@ -538,6 +543,8 @@ namespace SynthEdit2
 #ifdef DEBUG_HIT_TEST
 		_RPT3(0, "ViewBase::onPointerDown(%x, (%f, %f))\n", flags, point.x, point.y);
 #endif
+		Presenter()->NotDragging();
+
 		// handle edge-case of mouse clicking without any prior 'OnMove' (e.g. after clicking to make a pop-up menu disapear).
 		// ensures that 'mouseOverObject' is correct.
 		if (lastMovePoint != point)
@@ -564,7 +571,7 @@ namespace SynthEdit2
 			return mouseCaptureObject->onPointerDown(flags, point);
 		}
 
-		// account for objects apearing without mouse moving (e.g. show-on-parent changing on previous click).
+		// account for objects appearing without mouse moving (e.g. show-on-parent changing on previous click).
 		calcMouseOverObject(flags);
 
 		IViewChild* hitObject = nullptr;
@@ -646,6 +653,11 @@ namespace SynthEdit2
 
 	void ViewBase::RemoveChild(IViewChild* child)
 	{
+		if (mouseOverObject == child)
+		{
+			mouseOverObject = nullptr;
+		}
+
 		for (auto it = children.begin(); it != children.end(); ++it)
 		{
 			if ((*it).get() == child)
@@ -697,29 +709,30 @@ namespace SynthEdit2
 		if(mouseCaptureObject)
 		{
 			mouseCaptureObject->onPointerMove(flags, point);
-			return gmpi::MP_OK;
 		}
-
-		if(elementBeingDragged) // could this be handled with custom mouseCaptureObject? to remove need for check here?
+		else
 		{
-			// Snap-to-grid logic.
-			const auto snapGridSize = Presenter()->GetSnapSize();
-			GmpiDrawing::Size delta(point.x - pointPrev.x, point.y - pointPrev.y);
-			if(delta.width != 0.0f || delta.height != 0.0f) // avoid false snap on selection
+			if (elementBeingDragged) // could this be handled with custom mouseCaptureObject? to remove need for check here?
 			{
-				GmpiDrawing::Point snapReference(elementBeingDragged->getLayoutRect().left, elementBeingDragged->getLayoutRect().top);
+				// Snap-to-grid logic.
+				const auto snapGridSize = Presenter()->GetSnapSize();
+				GmpiDrawing::Size delta(point.x - pointPrev.x, point.y - pointPrev.y);
+				if (delta.width != 0.0f || delta.height != 0.0f) // avoid false snap on selection
+				{
+					GmpiDrawing::Point snapReference(elementBeingDragged->getLayoutRect().left, elementBeingDragged->getLayoutRect().top);
 
-				GmpiDrawing::Point newPoint = snapReference + delta;
-				newPoint.x = floorf((snapGridSize / 2 + newPoint.x) / snapGridSize) * snapGridSize;
-				newPoint.y = floorf((snapGridSize / 2 + newPoint.y) / snapGridSize) * snapGridSize;
-				GmpiDrawing::Size snapDelta = newPoint - snapReference;
+					GmpiDrawing::Point newPoint = snapReference + delta;
+					newPoint.x = floorf((snapGridSize / 2 + newPoint.x) / snapGridSize) * snapGridSize;
+					newPoint.y = floorf((snapGridSize / 2 + newPoint.y) / snapGridSize) * snapGridSize;
+					GmpiDrawing::Size snapDelta = newPoint - snapReference;
 
-				pointPrev += snapDelta;
+					pointPrev += snapDelta;
 
-				if(snapDelta.width != 0.0 || snapDelta.height != 0.0)
-					Presenter()->DragSelection(snapDelta);
+					if (snapDelta.width != 0.0 || snapDelta.height != 0.0)
+						Presenter()->DragSelection(snapDelta);
+				}
+				return gmpi::MP_OK;
 			}
-			return gmpi::MP_OK;
 		}
 
 		calcMouseOverObject(flags);
@@ -741,6 +754,10 @@ namespace SynthEdit2
 
 	void ViewBase::calcMouseOverObject(int32_t flags)
 	{
+		// when one object has captured mouse, don't highlight other objects.
+		if (mouseCaptureObject)
+			return;
+
 		IViewChild* hitObject{};
 
 		isIteratingChildren = true;
@@ -781,6 +798,8 @@ namespace SynthEdit2
 
 	int32_t ViewBase::onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 	{
+		Presenter()->NotDragging();
+
 		if(mouseCaptureObject)
 		{
 			mouseCaptureObject->onPointerUp(flags, point);
@@ -1002,6 +1021,9 @@ namespace SynthEdit2
 					{
 						releaseCapture();
 					}
+					if (mouseOverObject == dragline)
+						mouseOverObject = {};
+
 					const auto dragLineRect = (*it)->GetClipRect();
 					invalidateRect(&dragLineRect);
 
@@ -1236,13 +1258,22 @@ namespace SynthEdit2
 	void ViewBase::OnChangedChildPosition(int phandle, GmpiDrawing::Rect& newRect)
 	{
 		// Update module (and adorner position)
+		bool needToUpdateCables = false;
 		for(auto& m : children)
 		{
 			if(m->getModuleHandle() == phandle)
 			{
+				const auto originalSize = m->getLayoutRect().getSize();
 				m->OnMoved(newRect);
+				const auto newSize = m->getLayoutRect().getSize();
+
+				// handle the case only of a container changing size becuase it's embedded sub-view changed siae (and we need to update any connected lines)
+				needToUpdateCables |= originalSize != newSize;
 			}
 		}
+
+		if(needToUpdateCables)
+			UpdateCablesBounds();
 	}
 
 	void ViewBase::OnChangedChildNodes(int phandle, std::vector<GmpiDrawing::Point>& nodes)

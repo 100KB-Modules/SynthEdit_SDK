@@ -150,13 +150,6 @@ void UpdateRegionWinGdi::copyDirtyRects(HWND window, GmpiDrawing::SizeL swapChai
 	#define RGN_ERROR ERROR
 	*/
 
-	static bool once = true;
-	if (once)
-	{
-		once = false;
-//	_RPT2(_CRT_WARN, "W[%d,%d]\n", clientRect.right - clientRect.left, clientRect.bottom - clientRect.top);
-	}
-
 	auto regionType = GetUpdateRgn(
 		window,
 		hRegion,
@@ -175,14 +168,7 @@ void UpdateRegionWinGdi::copyDirtyRects(HWND window, GmpiDrawing::SizeL swapChai
 
 			GetRegionData(hRegion, size, pRegion);
 
-			// Overall bounding rect
-			{
-				auto& r = pRegion->rdh.rcBound;
-				bounds = GmpiDrawing::RectL(r.left, r.top, r.right, r.bottom);
-			}
-
 			const RECT* pRect = (const RECT*)& pRegion->Buffer;
-//			auto rectcount = pRegion->rdh.nCount;
 
 			for (unsigned i = 0; i < pRegion->rdh.nCount; i++)
 			{
@@ -603,6 +589,23 @@ int32_t Gmpi_Win_FileDialog::ShowAsync(gmpi_gui::ICompletionCallback* returnComp
 
 	wchar_t filename_buf[500];
 	wcscpy(filename_buf, initial_filename.c_str());
+
+	// initial folder often dosn't work due to baroque rules arround it.
+	// https://learn.microsoft.com/en-us/windows/win32/api/commdlg/ns-commdlg-openfilenamea
+	// we seem to be able to force it by filling in a fake filename with a wildcard.
+	// otherwise DAW just opens at the last random folder you browsed to.
+	std::wstring fullInitialPath;
+	if (initial_filename.empty())
+	{
+		std::wstring wildcard(L"*.");
+		wildcard += primary_extension.empty() ? L"*" : primary_extension;
+		fullInitialPath = combinePathAndFile(initial_folder, wildcard);
+	}
+	else
+	{
+		fullInitialPath = combinePathAndFile(initial_folder, initial_filename);
+	}
+	wcscpy(filename_buf, fullInitialPath.c_str());
 
 	OPENFILENAME ofn;
 	memset(&ofn, 0, sizeof(OPENFILENAME));

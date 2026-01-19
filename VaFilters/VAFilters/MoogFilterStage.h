@@ -5,8 +5,8 @@ class CMoogFilterStage :
 	public CBiQuad
 {
 public:
-	CMoogFilterStage(void);
-	~CMoogFilterStage(void);
+	CMoogFilterStage();
+	~CMoogFilterStage();
 
 protected:
 	// controls

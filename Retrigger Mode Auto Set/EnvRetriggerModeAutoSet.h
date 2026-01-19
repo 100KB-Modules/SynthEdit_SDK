@@ -8,7 +8,7 @@ class EnvRetriggerModeAutoSet : public MpBase
 public:
 	EnvRetriggerModeAutoSet( IMpUnknown* host );
 	void subProcess( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	virtual void onSetPins();
 
 private:
 	AudioInPin pinGate;

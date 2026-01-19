@@ -1,5 +1,6 @@
 #include "./Slider.h"
 
+SE_DECLARE_INIT_STATIC_FILE(Slider);
 REGISTER_PLUGIN2 ( Slider, L"SE Slider" );
 
 Slider::Slider()
@@ -15,7 +16,7 @@ void Slider::subProcess( int sampleFrames )
 	pinValueOut.subProcess(getBlockPosition(), sampleFrames, canSleep);
 }
 
-void Slider::onSetPins(void)
+void Slider::onSetPins()
 {
 	pinValueOut = 0.1f * pinValueIn; // 1 V = 0.1 audio.
 

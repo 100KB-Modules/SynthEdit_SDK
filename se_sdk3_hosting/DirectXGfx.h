@@ -12,10 +12,130 @@
 
 // #define LOG_DIRECTX_CALLS
 
+#define ENABLE_HDR_SUPPORT 1
+
 namespace gmpi
 {
 	namespace directx
 	{
+	// Helper for managing lifetime of Direct2D interface pointers
+	template<class wrappedObjT>
+	class ComPtr
+	{
+		mutable wrappedObjT* obj = {};
+
+	public:
+		ComPtr() {}
+
+		explicit ComPtr(wrappedObjT* newobj)
+		{
+			Assign(newobj);
+		}
+		ComPtr(const ComPtr<wrappedObjT>& value)
+		{
+			Assign(value.obj);
+		}
+		// Attach object without incrementing ref count. For objects created with new.
+		void Attach(wrappedObjT* newobj)
+		{
+			wrappedObjT* old = obj;
+			obj = newobj;
+
+			if (old)
+			{
+				old->Release();
+			}
+		}
+
+		~ComPtr()
+		{
+			if (obj)
+			{
+				obj->Release();
+			}
+		}
+		inline operator wrappedObjT* ()
+		{
+			return obj;
+		}
+		const wrappedObjT* operator=(wrappedObjT* value)
+		{
+			Assign(value);
+			return value;
+		}
+		ComPtr<wrappedObjT>& operator=(ComPtr<wrappedObjT>& value)
+		{
+			Assign(value.get());
+			return *this;
+		}
+		bool operator==(const wrappedObjT* other) const
+		{
+			return obj == other;
+		}
+		bool operator==(const ComPtr<wrappedObjT>& other) const
+		{
+			return obj == other.obj;
+		}
+		wrappedObjT* operator->() const
+		{
+			return obj;
+		}
+
+		wrappedObjT*& get()
+		{
+			return obj;
+		}
+
+		wrappedObjT** getAddressOf()
+		{
+			assert(obj == 0); // Free it before you re-use it!
+			return &obj;
+		}
+		wrappedObjT** put()
+		{
+			if (obj)
+			{
+				obj->Release();
+				obj = {};
+			}
+
+			return &obj;
+		}
+
+		void** put_void()
+		{
+			return (void**)put();
+		}
+
+		bool isNull() const
+		{
+			return obj == nullptr;
+		}
+
+		template<typename I>
+		ComPtr<I> as()
+		{
+			ComPtr<I> returnInterface;
+			if (obj)
+			{
+				obj->QueryInterface(__uuidof(I), returnInterface.put_void());
+			}
+			return returnInterface;
+		}
+
+	private:
+		// Attach object and increment ref count.
+		inline void Assign(wrappedObjT* newobj)
+		{
+			Attach(newobj);
+			if (newobj)
+			{
+				newobj->AddRef();
+			}
+		}
+	};
+
+
 		inline void SafeRelease(IUnknown* object)
 		{
 			if (object)
@@ -86,7 +206,9 @@ namespace gmpi
 		class SolidColorBrush final : /* Simulated: public GmpiDrawing_API::IMpSolidColorBrush,*/ public Brush
 		{
 		public:
-			SolidColorBrush(ID2D1SolidColorBrush* b, GmpiDrawing_API::IMpFactory *factory) : Brush(b, factory) {}
+			SolidColorBrush(ID2D1SolidColorBrush* b, GmpiDrawing_API::IMpFactory *factory
+			) : Brush(b, factory)
+			{}
 
 			inline ID2D1SolidColorBrush* nativeSolidColorBrush()
 			{
@@ -97,17 +219,26 @@ namespace gmpi
 			virtual void MP_STDCALL SetColor(const GmpiDrawing_API::MP1_COLOR* color) // simulated: override
 			{
 //				D2D1::ConvertColorSpace(D2D1::ColorF*) color);
-				nativeSolidColorBrush()->SetColor((D2D1::ColorF*) color);
+				const D2D1_COLOR_F c
+				{
+					color->r,
+					color->g,
+					color->b,
+					color->a
+				};
+
+				nativeSolidColorBrush()->SetColor(c);
 			}
 			virtual GmpiDrawing_API::MP1_COLOR MP_STDCALL GetColor() // simulated:  override
 			{
 				auto b = nativeSolidColorBrush()->GetColor();
-				//		return GmpiDrawing::Color(b.r, b.g, b.b, b.a);
+
 				GmpiDrawing_API::MP1_COLOR c;
 				c.a = b.a;
 				c.r = b.r;
 				c.g = b.g;
 				c.b = b.b;
+
 				return c;
 			}
 
@@ -509,8 +640,8 @@ namespace gmpi
 		{
 			bool alphaPremultiplied;
 			IWICBitmap* bitmap;
-			UINT bytesPerRow;
-			BYTE *ptr;
+			UINT bytesPerRow{};
+			BYTE* ptr{};
 			IWICBitmapLock* pBitmapLock;
 			ID2D1Bitmap* nativeBitmap_;
 			int flags;
@@ -553,6 +684,10 @@ namespace gmpi
 					alphaPremultiplied = _alphaPremultiplied;
 					if (!alphaPremultiplied)
 						unpremultiplyAlpha();
+				}
+				else
+				{
+					alphaPremultiplied = true; // prevent possible null deference of 'bitmap' in destructor
 				}
 			}
 
@@ -970,7 +1105,6 @@ namespace gmpi
 			std::vector<std::wstring> supportedFontFamiliesLowerCase;
 			std::vector<std::string> supportedFontFamilies;
 			std::map<std::wstring, std::wstring> GdiFontConversions;
-			bool DX_support_sRGB;
 
 		public:
 			static std::wstring_convert<std::codecvt_utf8<wchar_t>> stringConverter; // cached, as constructor is super-slow.
@@ -989,14 +1123,10 @@ namespace gmpi
 				return m_pDirect2dFactory;
 			}
 
-			void setSrgbSupport(bool s)
-			{
-				DX_support_sRGB = s;
-			}
-			
 			GmpiDrawing_API::IMpBitmapPixels::PixelFormat getPlatformPixelFormat()
 			{
-				return DX_support_sRGB ? GmpiDrawing_API::IMpBitmapPixels::kBGRA_SRGB : GmpiDrawing_API::IMpBitmapPixels::kBGRA;
+//				return DX_support_sRGB ? GmpiDrawing_API::IMpBitmapPixels::kBGRA_SRGB : GmpiDrawing_API::IMpBitmapPixels::kBGRA;
+				return GmpiDrawing_API::IMpBitmapPixels::kBGRA_SRGB;
 			}
 
 			Factory();
@@ -1025,8 +1155,6 @@ namespace gmpi
 				{
 					gmpi_sdk::mp_shared_ptr<gmpi::IMpUnknown> wrapper;
 					wrapper.Attach(new StrokeStyle(b, this));
-
-//					auto wrapper = gmpi_sdk::make_shared_ptr<StrokeStyle>(b, this);
 
 					return wrapper->queryInterface(GmpiDrawing_API::SE_IID_STROKESTYLE_MPGUI, reinterpret_cast<void**>(returnValue));
 				}
@@ -1062,7 +1190,6 @@ namespace gmpi
 			Factory* factory;
 			std::vector<GmpiDrawing_API::MP1_RECT> clipRectStack;
 			std::wstring_convert<std::codecvt_utf8<wchar_t>>* stringConverter; // cached, as constructor is super-slow.
-
 			void Init()
 			{
 				stringConverter = &(factory->stringConverter);
@@ -1117,7 +1244,14 @@ namespace gmpi
 				_RPT0(_CRT_WARN, "context_->Clear(c);\n");
 				_RPT0(_CRT_WARN, "}\n");
 #endif
-				context_->Clear((D2D1_COLOR_F*)clearColor);
+				const D2D1_COLOR_F c
+				{
+					clearColor->r,
+					clearColor->g,
+					clearColor->b,
+					clearColor->a
+				};
+				context_->Clear(&c);
 			}
 
 			void MP_STDCALL DrawLine(GmpiDrawing_API::MP1_POINT point0, GmpiDrawing_API::MP1_POINT point1, const GmpiDrawing_API::IMpBrush* brush, float strokeWidth, const GmpiDrawing_API::IMpStrokeStyle* strokeStyle) override
@@ -1158,18 +1292,21 @@ namespace gmpi
 			//	void MP_STDCALL DrawBitmap( GmpiDrawing_API::IMpBitmap* mpBitmap, GmpiDrawing::Rect destinationRectangle, float opacity, int32_t interpolationMode, GmpiDrawing::Rect sourceRectangle) override
 			void MP_STDCALL DrawBitmap(const GmpiDrawing_API::IMpBitmap* mpBitmap, const GmpiDrawing_API::MP1_RECT* destinationRectangle, float opacity, /* MP1_BITMAP_INTERPOLATION_MODE*/ int32_t interpolationMode, const GmpiDrawing_API::MP1_RECT* sourceRectangle) override
 			{
-				auto bm = ((Bitmap*)mpBitmap);
+				auto bm = (Bitmap*) mpBitmap;
+				if (!bm)
+					return;
+
 				auto bitmap = bm->GetNativeBitmap(context_);
-				if (bitmap)
-				{
-					context_->DrawBitmap(
-						bitmap,
-						(D2D1_RECT_F*)destinationRectangle,
-						opacity,
-						(D2D1_BITMAP_INTERPOLATION_MODE) interpolationMode,
-						(D2D1_RECT_F*)sourceRectangle
-					);
-				}
+				if (!bitmap)
+					return;
+
+				context_->DrawBitmap(
+					bitmap,
+					(D2D1_RECT_F*)destinationRectangle,
+					opacity,
+					(D2D1_BITMAP_INTERPOLATION_MODE)interpolationMode,
+					(D2D1_RECT_F*)sourceRectangle
+				);
 			}
 
 			void MP_STDCALL SetTransform(const GmpiDrawing_API::MP1_MATRIX_3X2* transform) override
@@ -1434,7 +1571,7 @@ namespace gmpi
 
 			GMPI_REFCOUNT;
 		};
-
+#if 0
 		// Direct2D context tailored to devices without sRGB high-color support. i.e. Windows 7.
 		class GraphicsContext_Win7 : public GraphicsContext
 		{
@@ -1481,5 +1618,6 @@ namespace gmpi
 				context_->Clear((D2D1_COLOR_F*)&color);
 			}
 		};
+#endif
 	} // Namespace
 } // Namespace

@@ -5,6 +5,7 @@
 #include "PatchMemoryBoolGui.h"
 
 REGISTER_GUI_PLUGIN( PatchMemoryBoolGui, L"SE PatchMemory Bool" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryBoolGui);
 
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryBoolGui::on##name##Changed ) );
 
@@ -37,12 +38,17 @@ void PatchMemoryBoolGui::onValueChanged()
 
 void PatchMemoryBoolGui::onAnimationInChanged()
 {
-	pinAnimationPosition = pinAnimationIn;
+	if(!inhibitFeedback) // prevent jitter
+	{
+		pinAnimationPosition = pinAnimationIn;
+	}
 }
 
 void PatchMemoryBoolGui::onAnimationPositionChanged()
 {
+	inhibitFeedback = true;
 	pinAnimationIn = pinAnimationPosition;
+	inhibitFeedback = false;
 }
 
 void PatchMemoryBoolGui::onNameInChanged()

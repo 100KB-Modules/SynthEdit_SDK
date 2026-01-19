@@ -1,20 +1,9 @@
 // CSoundFont.cpp
 //
-//#define _AFXDLL
-
-//#include <windows.h>
-//#include <mmsystem.h>
 #include <algorithm>
 #include <assert.h>
-#include "CSoundFont.h"
+#include "csoundfont.h"
 #include "RiffFile2.h"
-
-#ifdef _DEBUG
-#define new DEBUG_NEW
-#undef THIS_FILE
-static char THIS_FILE[] = __FILE__;
-#endif
-
 
 CSoundFont::CSoundFont() : 
 	chunk_inst(NULL)
@@ -32,7 +21,7 @@ CSoundFont::CSoundFont() :
 //	_RPT1(_CRT_WARN, "NEW CSoundFont() %d\n", this );
 }
 
-bool CSoundFont::Load( gmpi::IProtectedFile* file )
+bool CSoundFont::Load( gmpi::IProtectedFile2* file )
 {
 	RiffFile2 riff;
 	uint32_t riff_type;
@@ -43,7 +32,8 @@ bool CSoundFont::Load( gmpi::IProtectedFile* file )
 	if( riff_type != MAKEFOURCC('s', 'f', 'b', 'k') )	// sf2 file
 		return true;
 
-	riff.REG_CHUNK( "Sample Data",			"sdta", "smpl", &chunk_smpl, &count_smpl, WORD);
+//	riff.REG_CHUNK( "Sample Data",			"sdta", "smpl", &chunk_smpl, &count_smpl, WORD);
+	riff.AddChunk(RiffFile2::riff_match("Sample Data", "sdta", "smpl", ((char**)&chunk_smpl), &count_smpl, sizeof(WORD), 0, padSampleMemorybytes));
 	riff.REG_CHUNK( "Preset Headers",		"pdta", "phdr", &chunk_phdr, &count_phdr, sfPresetHeader);
 	riff.REG_CHUNK( "Preset Bag Headers",	"pdta", "pbag", &chunk_pbag, &count_pbag, sfPresetBag);
 	riff.REG_CHUNK( "Preset Layer Modulators","pdta","pmod", &chunk_pmod, &count_pmod, sfModList);
@@ -381,8 +371,6 @@ void Jzone::SetDefaults()
 
 void Jzone::Set(sfInstGenList *igen)
 {
-	assert( igen->sfGenOper < NUM_SF_MODULATORS );
-
 	if( igen->sfGenOper < NUM_SF_MODULATORS )
 		value[igen->sfGenOper] = igen->genAmount;
 }

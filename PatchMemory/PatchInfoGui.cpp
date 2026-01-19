@@ -1,7 +1,7 @@
 #include "./PatchInfoGui.h"
 
-
 REGISTER_GUI_PLUGIN( PatchInfoGui, L"SE Patch Info" );
+SE_DECLARE_INIT_STATIC_FILE(PatchInfo_Gui)
 
 PatchInfoGui::PatchInfoGui(IMpUnknown* host) : MpGuiBase(host)
 {
@@ -22,9 +22,6 @@ PatchInfoGui::PatchInfoGui(IMpUnknown* host) : MpGuiBase(host)
 	initializePin( 11, patchCommandListOut );
 
 	initializePin( 12, patchCommandListIn, static_cast<MpGuiBaseMemberPtr>( &PatchInfoGui::onSetPatchCommandListIn ) );
-
-	initializePin(CategoryIn, static_cast<MpGuiBaseMemberPtr>(&PatchInfoGui::onSetCategoryIn));
-	initializePin(CategoryOut, static_cast<MpGuiBaseMemberPtr>(&PatchInfoGui::onSetCategoryOut));
 }
 
 int32_t PatchInfoGui::initialize()
@@ -32,10 +29,6 @@ int32_t PatchInfoGui::initialize()
 	channelListOut = L"All=-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16";
 //	patchCommandListOut = L",Copy Patch,Load Inst,Save Inst,Load Bank,Save Bank";
 
-	/* test SDK functionality
-	wchar_t test[90];
-	getHost()->resolveFilename(L"test.txt", sizeof(test) / sizeof(test[0]), test);
-	*/
 	return gmpi::MP_OK;
 }
 
@@ -56,10 +49,9 @@ void PatchInfoGui::onSetprogramNameIn()
 {
 	programNameOut = programNameIn;
 }
-
-void PatchInfoGui::onSetCategoryIn()
+void PatchInfoGui::onSetprogramNameOut()
 {
-	CategoryOut = CategoryIn;
+	programNameIn = programNameOut;
 }
 
 void PatchInfoGui::onSetprogramNamesListIn()
@@ -75,16 +67,6 @@ void PatchInfoGui::onSetmidiChannelIn()
 void PatchInfoGui::onSetprogramOut()
 {
 	programIn = programOut;
-}
-
-void PatchInfoGui::onSetprogramNameOut()
-{
-	programNameIn = programNameOut;
-}
-
-void PatchInfoGui::onSetCategoryOut()
-{
-	CategoryIn = CategoryOut;
 }
 
 void PatchInfoGui::onSetchannelOut()

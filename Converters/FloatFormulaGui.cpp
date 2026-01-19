@@ -22,18 +22,25 @@ FloatFormulaGui::FloatFormulaGui( IMpUnknown* host ) : MpGuiBase(host)
 // handle pin updates.
 void FloatFormulaGui::onSetValueIn()
 {
+	// Prevent visual jitter/sticking with floating point outputs.
+	if (valueIn == currentValue && !currentValueNull)
+		return;
+
+	currentValue = valueIn;
+	currentValueNull = false;
+
 	double B;
 	double A = valueIn;
 	int flags = 0;
-	ee.SetValue( "a", &A );
-	ee.Evaluate( formulaB_ascii.c_str(), &B, &flags );
+	ee.SetValue("a", &A);
+	ee.Evaluate(formulaB_ascii.c_str(), &B, &flags);
 
-	if(!std::isfinite(B) )
+	if (!std::isfinite(B))
 	{
-		valueOut = 0.0f;
+		B = 0.0f;
 	}
 
-	valueOut = (float) B;
+	valueOut = (float)B;
 }
 
 void FloatFormulaGui::onSetValueOut()
@@ -46,10 +53,13 @@ void FloatFormulaGui::onSetValueOut()
 
 	if( !std::isfinite(A) )
 	{
-		valueIn = 0.0f;
+		A = 0.0f;
 	}
 
-	valueIn = (float) A;
+	currentValue = (float)A;
+	currentValueNull = false;
+
+	valueIn = currentValue; // will recursivly (and unnesc) callback on onSetValueIn()
 }
 
 void FloatFormulaGui::onSetFormulaA()
@@ -60,7 +70,7 @@ void FloatFormulaGui::onSetFormulaA()
 		formulaA_ascii = "0";
 	}
 
-	onSetValueOut();
+// no, cause signal flow toward input during init:	onSetValueOut();
 }
 
 void FloatFormulaGui::onSetFormulaB()
@@ -70,6 +80,7 @@ void FloatFormulaGui::onSetFormulaB()
 	{
 		formulaB_ascii = "0";
 	}
+	currentValueNull = true;
 	onSetValueIn();
 }
 

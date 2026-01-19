@@ -8,6 +8,7 @@
 #include "FloatToText.h"
 
 REGISTER_GUI_PLUGIN( FloatToTextGui, L"SE FloatToText GUI" );
+SE_DECLARE_INIT_STATIC_FILE(FloatToTextGUI_Gui);
 
 FloatToTextGui::FloatToTextGui( IMpUnknown* host ) : MpGuiBase( host )
 {
@@ -54,11 +55,11 @@ void FloatToTextGui::onInputChanged()
 
 	wchar_t outputString[maxSize];
 
-	#if defined(_MSC_VER)
-		swprintf_s( outputString, maxSize, formatString, (double) (float) inputValue );
-	#else
+	//#if defined(_MSC_VER)
+	//	swprintf_s( outputString, maxSize, formatString, (double) (float) inputValue );
+	//#else
 		swprintf( outputString, maxSize, formatString, (double) (float) inputValue );
-	#endif
+//	#endif
 
 	// Replace -0.0 with 0.0 ( same for -0.00 and -0.000 etc).
 	// deliberate 'feature' of printf is to round small negative numbers to -0.0

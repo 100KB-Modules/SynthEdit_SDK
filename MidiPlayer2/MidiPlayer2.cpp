@@ -3,6 +3,8 @@
 #include <climits> // INT_MAX
 #include "./MidiPlayer2.h"
 #include "smf.h"
+#include "../shared/unicode_conversion.h"
+#include "../se_sdk3/MpString.h"
 
 #define NOTE_OFF				0x80
 #define NOTE_OFF_SIZE			2
@@ -58,7 +60,8 @@ MidiPlayer2::MidiPlayer2( IMpUnknown* host, bool initializePins ) : MpBase( host
 		initializePin( 3, pinMIDIOut );
 		initializePin( 4, pinHostBpm );
 		initializePin( 5, pinTempoFrom );
-		initializePin( 6, pinLoopMode );
+		initializePin(6, pinLoopMode);
+		initializePin(pinSendClocks);
 	}
 	memset( noteMemory, 0, sizeof(noteMemory) );
 }
@@ -120,7 +123,7 @@ void MidiPlayer2::subProcess( int bufferOffset, int sampleFrames )
 	}
 }
 
-void MidiPlayer2::onSetPins(void)
+void MidiPlayer2::onSetPins()
 {
 	if( pinFileName.isUpdated() )
 	{
@@ -133,6 +136,11 @@ void MidiPlayer2::onSetPins(void)
 	// Setting tempo depends on PPQN value from MIDI file, so this MUST be done after pinFileName.
 	if( pinTempoFrom.isUpdated() || pinHostBpm.isUpdated() || pinFileName.isUpdated() )
 	{
+		// NOTE: If MIDI Player is upstream of MIDI-CV, it will be tagged as 'one block latency'.
+		// This can result in it getting a BPM of 0.0 at startup, followed by actual BPM one block later.
+		// This happens only on first run, on subseqent runs, the parameter will tend to have the correct BPM 'left over' from the previous run.
+
+//		_RPTN(0, "MidiPlayer2 pinHostBpm=%f\n", pinHostBpm.getValue());
 		if( pinTempoFrom == 1 ) // Tempo from Host.
 		{
 			Setbpm( pinHostBpm );
@@ -227,7 +235,7 @@ void MidiPlayer2::ChooseSubProcess()
 	}
 }
 
-int MidiPlayer2::loadMidiFile(void)
+int MidiPlayer2::loadMidiFile()
 {
 	memset( trackInfo_, 0, sizeof(trackInfo_) );
 
@@ -236,6 +244,8 @@ int MidiPlayer2::loadMidiFile(void)
 	tracks = 0;
 	ppqn = 0;
 	counter = 0;
+	delete[] buffer;
+	buffer = {};
 
 	NotesOff( blockPosition() );
 
@@ -244,30 +254,18 @@ int MidiPlayer2::loadMidiFile(void)
 		return 1;
 	}
 
-	// open imbedded (or not) file.
-	gmpi::IProtectedFile* file = 0;
-
 	std::wstring fname = pinFileName;
 	if( fname.find( L".mid" ) == std::string::npos && fname.find( L".MID" ) == std::string::npos )
 	{
 		fname += L".mid";
 	}
 
-	int r = getHost()->openProtectedFile( fname.c_str(), &file );
-
-	if( r != gmpi::MP_OK )
-	{
-		// todo FileName = ERROR_MESSAGE_1 + FileName;
-		message( ERROR_MESSAGE_1 );
-		return 1;
-	}
-
-	int32_t file_size;
-	r = file->getSize(file_size);
-	delete [] buffer;
+	const auto fullFilename = host.resolveFilename(fname);
+	auto file = host.openUri(fullFilename);
+	const int64_t file_size = file.size();
+	
 	buffer = new unsigned char[file_size + 2];
-	file->read( (char*) buffer, file_size );
-	file->close();
+	file.read( (char*) buffer, file_size );
 
 	// first check that the file loaded is actually a MIDI File
 	unsigned char* g_pointer = buffer;
@@ -277,10 +275,9 @@ int MidiPlayer2::loadMidiFile(void)
 		delete [] buffer;
 		buffer = 0;
 		message( ERROR_MESSAGE_2);
-		//		AudioMaster()->end_run();
 		return 1;
 	}
-
+	
 	// This is a Standard MIDI File, so get header details
 	MIDIHeaderChunk* head = (MIDIHeaderChunk*)g_pointer;
 	format = head->GetFormat();
@@ -361,8 +358,11 @@ void MidiPlayer2::NextMidiEvent(int bufferOffset)
 
 	if( next_midi_clock == pulse_count )
 	{
-		midiMessage[0] = MIDI_CLOCK;
-		pinMIDIOut.send( midiMessage, 1, bufferOffset );
+		if (pinSendClocks)
+		{
+			midiMessage[0] = MIDI_CLOCK;
+			pinMIDIOut.send(midiMessage, 1, bufferOffset);
+		}
 		next_midi_clock += pulses_per_clock;
 	}
 
@@ -604,23 +604,37 @@ MidiPlayer2::~MidiPlayer2()
 
 void MidiPlayer2::Setbpm(double bpm)
 {
+	const auto prev_samp_per_pulse = samp_per_pulse;
+
 	bpm = (std::max)(bpm,10.);
 	bpm = (std::min)(bpm, 1000.);
-	double pp_sec = bpm / 60.0 * (double) ppqn;
+	double pp_sec = bpm / 60.0 * ppqn;
 	samp_per_pulse = getSampleRate() / pp_sec;
 //	_RPT1(_CRT_WARN, "samp_per_pulse %f.\n", samp_per_pulse );
+
+	// adjust time left on next event.
+	if (counter > 0)
+	{
+		counter = static_cast<int>( counter * samp_per_pulse / prev_samp_per_pulse);
+	}
 }
 
 void MidiPlayer2::MidiClockStart( int bufferOffset )
 {
-	unsigned char msg = MIDI_CLOCK_START;
-	pinMIDIOut.send( &msg, 1, bufferOffset );
+	if (pinSendClocks)
+	{
+		unsigned char msg = MIDI_CLOCK_START;
+		pinMIDIOut.send(&msg, 1, bufferOffset);
+	}
 }
 
 void MidiPlayer2::MidiClockStop( int bufferOffset )
 {
-	unsigned char msg = MIDI_CLOCK_STOP;
-	pinMIDIOut.send( &msg, 1, bufferOffset );
+	if (pinSendClocks)
+	{
+		unsigned char msg = MIDI_CLOCK_STOP;
+		pinMIDIOut.send(&msg, 1, bufferOffset);
+	}
 }
 
 void MidiPlayer2::Done()
@@ -639,7 +653,7 @@ void MidiPlayer2::Done()
 void MidiPlayer2::message( const wchar_t* txt )
 {
 #ifdef _WIN32
-	MessageBox(0,txt, L"MidiPlayer2", MB_OK );
+	::MessageBox(0, txt, L"MidiPlayer2", MB_OK );
 #else
     assert(false); // TODO.
 #endif

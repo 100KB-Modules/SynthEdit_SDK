@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 
 <PluginList>
-	<Plugin id="SE Rectangle" name="Rectangle" category="Sub-Controls" graphicsApi="composited" helpUrl="synthedit.chm::/mdl_sdk3/Rectangle.htm">
+	<Plugin id="SE Rectangle" name="Rectangle" category="Old" graphicsApi="composited" helpUrl="synthedit.chm::/mdl_sdk3/Rectangle.htm">
 		<GUI>
 			<Pin id="0" name="Corner Radius" direction="in" datatype="float" default="10" isMinimised="true"/>
 			<Pin id="1" name="Top Left" direction="in" datatype="bool" default="1" isMinimised="true"/>

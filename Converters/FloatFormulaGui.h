@@ -1,8 +1,9 @@
 #ifndef FLOATFORMULAGUI_H_INCLUDED
 #define FLOATFORMULAGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 #include "../shared/expression_evaluate.h"
+#include <cmath>
 
 class FloatFormulaGui : public MpGuiBase
 {
@@ -25,6 +26,9 @@ private:
 
 	std::string formulaA_ascii;
 	std::string formulaB_ascii;
+
+	float currentValue = 0.0f;
+	bool currentValueNull = true;
 };
 
 #endif

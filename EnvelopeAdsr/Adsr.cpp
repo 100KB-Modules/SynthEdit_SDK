@@ -1,6 +1,7 @@
 #include "./Adsr.h"
 
 REGISTER_PLUGIN( Adsr, L"SynthEdit ADSR" );
+SE_DECLARE_INIT_STATIC_FILE(ADSR)
 
 Adsr::Adsr( IMpUnknown* host ) : Envelope( host )
 {

@@ -13,6 +13,8 @@
 #include <stdio.h>
 #include "./Reverb.h"
 
+SE_DECLARE_INIT_STATIC_FILE(Reverb);
+
 REGISTER_PLUGIN ( Reverb, L"DH_Reverb 1.0J" );
 
 #define ZeroOutMemory(addr,size) memset(addr,0,size)
@@ -70,7 +72,8 @@ Reverb::Reverb( IMpUnknown* host ) : MpBase( host )
 	initializePin( 6, pinWidth );
 	initializePin( 7, pinDamp );
 	initializePin( 8, pinMix );
-	initializePin( 9, pinMode );
+	initializePin(9, pinMode);
+	initializePin(pinClearTails);
 }
 
 int32_t Reverb::open()
@@ -93,11 +96,11 @@ int32_t Reverb::open()
 	return gmpi::MP_OK;
 }
 
-void Reverb::onSetPins(void)
+void Reverb::onSetPins()
 {
 	// resignal to downstream
 	bool out_stat = ( tail_finished || buffers_clean ) ? false : true;
-	input_stat = pinLIn.isStreaming(); // getPin( PN_INPUT1 )->getStatus();
+	input_stat = pinLIn.isStreaming();
 
 	if( input_stat == true ) // ST_RUN )
 	{
@@ -125,6 +128,14 @@ void Reverb::onSetPins(void)
 /*	else
 		monocopy = 1;
 */
+	mode = pinMode.getValue();
+
+	// In FL Studio clip effects especially, the DAW can pause the plugin at the end of the clip, and not resume calling it until the next time it plays the start of the clip.
+	// this results in 'tails' playing at the next *start* of the clip. To avoid this, we clear the tails when the plugin is paused.
+	if (pinClearTails.isUpdated() && pinClearTails.getValue() != 0) // clear-tails is 0 on first sample
+	{
+		mute();
+	}
 
 	// set up sleep mode if inactive
 	if( !out_stat )
@@ -199,8 +210,9 @@ void Reverb::subProcess( int bufferOffset, int sampleFrames )
 			}
 		}
 		break;
+
 	default:
-		;  // nothing to be done for Normal Mode 
+		break;  // nothing to be done for Normal Mode 
 	}
 	
 	float *inputL = bufferOffset + pinLIn.getBuffer();

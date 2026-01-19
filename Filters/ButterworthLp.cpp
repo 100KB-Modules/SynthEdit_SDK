@@ -2,6 +2,14 @@
 
 using namespace gmpi;
 
+SE_DECLARE_INIT_STATIC_FILE(ButterworthHp); // old
+SE_DECLARE_INIT_STATIC_FILE(ButterworthHs); // old
+SE_DECLARE_INIT_STATIC_FILE(ButterworthHP);
+SE_DECLARE_INIT_STATIC_FILE(ButterworthHS);
+SE_DECLARE_INIT_STATIC_FILE(ButterworthBP);
+SE_DECLARE_INIT_STATIC_FILE(ButterworthBS);
+SE_DECLARE_INIT_STATIC_FILE(ButterworthLS);
+
 REGISTER_PLUGIN2(ButterworthLp, L"SE Butterworth LP")
 REGISTER_PLUGIN2(ButterworthHp, L"SE Butterworth HP")
 REGISTER_PLUGIN2(ButterworthBp, L"SE Butterworth BP")
@@ -9,13 +17,6 @@ REGISTER_PLUGIN2(ButterworthBr, L"SE Butterworth BR")
 REGISTER_PLUGIN2(ButterworthBandShelf, L"SE Butterworth BS")
 REGISTER_PLUGIN2(ButterworthLowShelf, L"SE Butterworth LS")
 REGISTER_PLUGIN2(ButterworthHighShelf, L"SE Butterworth HS")
-
-//REGISTER_PLUGIN2(ButterworthBpOct, L"SE Butterworth BP-OCT")
-//REGISTER_PLUGIN2(ButterworthBrOct, L"SE Butterworth BR-OCT")
-
-//REGISTER_PLUGIN2(EllipticLp, L"SE Elliptic LP");
-//REGISTER_PLUGIN2(EllipticHp, L"SE Elliptic HP");
-
 
 /*
 //#include <iomanip>
@@ -104,7 +105,7 @@ public:
 		initializePin(pinWidthHz);
 	}
 
-	void onSetPins(void) override
+	void onSetPins() override
 	{
 		const float minOctave = 0.001f;
 		const float minFreq = 0.001f; // 1Hz
@@ -136,7 +137,7 @@ public:
 		initializePin(pinWidthHz);
 	}
 
-	void onSetPins(void) override
+	void onSetPins() override
 	{
 		const float minOctave = 0.001f;
 		const float minFreq = 0.001f; // 1Hz
@@ -161,3 +162,4 @@ namespace
 	auto r = Register<OctavesToHzPassband>::withId(L"SE Octaves to Hz (Passband)");
 	auto r2 = Register<OctavesToHzPassband2>::withId(L"SE Octaves to Hz (Passband)2");
 }
+

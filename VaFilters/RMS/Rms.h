@@ -2,6 +2,7 @@
 #define RMS_H_INCLUDED
 
 #include "../SvFilterClassic/SvFilter2.h"
+#include "../shared/xp_simd.h"
 
 class Rms : public SvFilter2
 {
@@ -14,27 +15,22 @@ class Rms : public SvFilter2
 
 public:
 	virtual void initializePins() override;
-//	virtual int32_t MP_STDCALL open() override;
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 	virtual void ChoseProcessMethod() override;
 
-	inline float fastSquareRoot(float v) // Approximated by lookup table. Accurate between 0 - 20 Volts. 
+	inline float fastSquareRoot(float v)
 	{
-//		return sqrt(v); MCC++ 0.0265 CPU. (but with SSE enabled).. (needs max(0,v) )
-
+#if !GMPI_USE_SSE
+        return sqrtf(v); // MCC++ 0.0265 CPU. (but with SSE enabled).. (needs max(0,v) )
+#else
 		// 0.0265 CPU. Winner.
 		float r;
 		const __m128 staticZero = _mm_setzero_ps();
 		_mm_store_ss(&r, _mm_sqrt_ss(_mm_max_ps(_mm_load_ss(&v), staticZero)));
 		return r;
+#endif
 
-		/*
-		// 0.0265 CPU. (needs max(0,v) )
-		float r;
-		__m128 in = _mm_load_ss(&v);
-		_mm_store_ss(&r, _mm_mul_ss(in, _mm_rsqrt_ss(in)));
-		return r;
-		*/
+
 #if 0
 		//0.039 CPU.
 		float index = v * (float)(tableEntries / 2); // table covers 20V, hence division by 2.

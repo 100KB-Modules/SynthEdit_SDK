@@ -4,9 +4,9 @@
 #include <algorithm>
 #include "../se_sdk3/mp_sdk_gui2.h"
 #include "../shared/ImageMetadata.h"
-#include "BitmapWidget.h"
-#include "EditWidget.h"
-#include "TextWidget.h"
+#include "../sharedLegacyWidgets/BitmapWidget.h"
+#include "../sharedLegacyWidgets/EditWidget.h"
+#include "../sharedLegacyWidgets/TextWidget.h"
 
 class SliderGui : public gmpi_gui::MpGuiGfxBase
 {
@@ -14,8 +14,11 @@ class SliderGui : public gmpi_gui::MpGuiGfxBase
 	TextWidget headerWidget;
 	EditWidget edit;
 	Widget* captureWidget;
+	bool backwardCompatibleVerticalArrange = {};
 
 public:
+	static std::wstring SliderFloatToString(float val, int p_decimal_places = -1);
+
 	SliderGui();
 
 	virtual int32_t MP_STDCALL initialize() override;
@@ -34,10 +37,11 @@ public:
 	int32_t MP_STDCALL getToolTip(GmpiDrawing_API::MP1_POINT point, gmpi::IString* returnString) override
 	{
 		auto utf8String = (std::string)pinHint;
-		returnString->setData(utf8String.data(), utf8String.size());
+		returnString->setData(utf8String.data(), static_cast<int32_t>(utf8String.size()));
 
 		return gmpi::MP_OK;
 	}
+	int32_t MP_STDCALL onMouseWheel(int32_t flags, int32_t delta, GmpiDrawing_API::MP1_POINT point) override;
 
 private:
 	void onSetValueIn();

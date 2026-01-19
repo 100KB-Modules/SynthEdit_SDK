@@ -8,7 +8,7 @@ class BpmClock3 : public MpBase
 public:
 	BpmClock3( IMpUnknown* host );
 	void subProcess2( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	virtual void onSetPins();
 	static double CalcAccumulatorError(float HostSongPosition, double accumulator, int pulseDivision, float hostBarStart, int numerator, int denominator);
 
 private:

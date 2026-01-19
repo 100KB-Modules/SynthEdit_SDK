@@ -3,6 +3,8 @@
 #include "../shared/expression_evaluate.h"
 #include "../shared/unicode_conversion.h"
 
+SE_DECLARE_INIT_STATIC_FILE(Waveshaper3Xp);
+
 using namespace std;
 using namespace gmpi;
 
@@ -12,7 +14,7 @@ protected:
 	StringInPin pinShape;
 	AudioInPin pinSignalIn;
 	AudioOutPin pinSignalOut;
-	const static int WS_NODE_COUNT = 11;
+	static const int WS_NODE_COUNT = 11;
 	float* m_lookup_table;
 	static const int TABLE_SIZE = 512;
 
@@ -74,7 +76,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
 		if (pinShape.isUpdated())
 		{
@@ -191,7 +193,7 @@ public:
 			ee.Evaluate(formulaUtf8.c_str(), &y, &flags);
 
 #if _MSC_VER >= 1600 // Only Avail in VS2010 or later.
-			if (_isnan(y))
+			if (isnan(y))
 			{
 				y = 0.0;
 			}

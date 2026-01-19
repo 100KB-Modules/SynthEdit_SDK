@@ -14,9 +14,25 @@ void GuiComTest2::onSetPins(void)
 	pinOut.setStreaming( pinIn.isStreaming() );
 }
 
-
-int32_t MP_STDCALL GuiComTest2::recieveMessageFromGui( int32_t id, int32_t size, void* messageData )
+int32_t GuiComTest2::receiveMessageFromGui( int32_t id, int32_t size, const void* messageData )
 {
-	_RPT1(_CRT_WARN, "recieveMessageFromGui %d\n", this );
+	_RPT1(_CRT_WARN, "DSP: recieveMessageFromGui size %d bytes\n", size );
+
+	std::vector<char> data;
+
+	if ((++clickCount % 3) == 0)
+	{
+		// 6MB
+		data.assign(1048576 * 6, 0);
+	}
+	else
+	{
+		data.assign(21, 0);
+	}
+
+	_RPT1(_CRT_WARN, "DSP: ...sending size %d bytes\n", (int) data.size() );
+
+	getHost()->sendMessageToGui( 23, data.size(), data.data() );
+
 	return gmpi::MP_OK;
 }

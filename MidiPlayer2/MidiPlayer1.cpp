@@ -14,7 +14,7 @@ MidiPlayer1::MidiPlayer1( IMpUnknown* host ) : MidiPlayer2( host, false )
 	gate_state = trigger_state = true;// Older version don't have these pins, just pretent they're 'on'.
 }
 
-void MidiPlayer1::onSetPins(void)
+void MidiPlayer1::onSetPins()
 {
 	if( pinFileName.isUpdated() )
 	{

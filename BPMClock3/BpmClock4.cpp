@@ -120,6 +120,7 @@ void BpmClock4::subProcess2(int sampleFrames)
 
 void BpmClock4::CalcIncrement(float overmultiplier)
 {
+	// ug_oversampler_in::TransmitInitialPinValues() will transmit value 0 on all pins, actual value will arrive a few samples later.
 	assert(pinHostBpm.getValue() > 0);
 
 //	increment = pinHostBpm / (multiplier * getSampleRate() * 60.0f);
@@ -162,7 +163,7 @@ double BpmClock4::CalcAccumulatorError(double HostSongPosition, double accumulat
 	return accumulatorError;
 }
 
-void BpmClock4::onSetPins(void)
+void BpmClock4::onSetPins()
 {
 	if (pinPulseDivide.isUpdated())
 	{
@@ -208,7 +209,7 @@ void BpmClock4::onSetPins(void)
 
 	bool resync = false;
 	// Special case - When DAW hits 'play' sync at least to next bar, else could be waiting several bars.
-	if( pinHostTransport.isUpdated() && pinHostTransport == true ) // && pinPulseDivide <= -resyncDivisions )
+	if( pinHostTransport.isUpdated() && pinHostTransport == true )
 	{
 //		_RPTW1(_CRT_WARN, L"TRANSPORT START: Bar %f ********************\n", 0.25f * (float) pinHostSongPosition );
 		resync = true;
@@ -241,11 +242,7 @@ void BpmClock4::onSetPins(void)
 #ifdef DEBUG_BPMCLOCK
             _RPTW1(_CRT_WARN, L"TRANSPORT JUMP: Bar %f ********************\n", 0.25f * (float) pinHostSongPosition );
 #endif
-			resync = /*resyncInProgress =*/ true;
-//			multi plier = (std::min)(multi plier, resyncMultiplier);
-
-			// Recalc accumulator error given new PulseDivide.
-//			accumulatorError = CalcAccumulatorError(pinHostSongPosition, accumulator, multi plier, pinHostBarStart);
+			resync = true;
 		}
 
 		accumulator -= accumulatorError;

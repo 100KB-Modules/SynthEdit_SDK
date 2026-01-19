@@ -2,6 +2,7 @@
 #include "../shared/xplatform.h"
 
 REGISTER_PLUGIN(Scope3, L"SE Scope3 XP");
+SE_DECLARE_INIT_STATIC_FILE(Scope3XP);
 
 /* TODO !!!
 	properties->flags = UGF_VOICE_MON_IGNORE;
@@ -10,7 +11,7 @@ REGISTER_PLUGIN(Scope3, L"SE Scope3 XP");
 
 Scope3::Scope3( IMpUnknown* host ) : MpBase( host )
 ,index_( 0 )
-,sleepCount( -1 )
+//,sleepCount( -1 )
 ,currentVoice_( 0 )
 {
 }
@@ -30,7 +31,7 @@ int32_t Scope3::open()
 
 	SET_PROCESS( &Scope3::subProcess );
 
-	channelActive_[0] = channelActive_[1] = true; // TODO !! getPin(i)->IsConnected();
+//	channelActive_[0] = channelActive_[1] = true; // TODO !! getPin(i)->IsConnected();
 
 	// Module must transmit an initial value on all output pins. [ now handled by SDK ]
 	//pinSamplesA.sendPinUpdate();
@@ -41,31 +42,7 @@ int32_t Scope3::open()
 	getHost()->isCloned( &isCloned );
 	pinPolyDetect = isCloned != 0;
 
-//	setSleep( false ); // disable automatic sleeping.
-
-#if defined( SE_TARGET_WAVES)
-	// Create shared variable to track most recent voice.
-	// Used in waves platform to provide monophonic scope trace.
-	// Only most recent voice is updated in GUI.
-	wchar_t name[40];
-	int32_t handle;
-	getHost()->getHandle(handle);
-	swprintf(name, 40, L"SE Scope3 %x currentvoice", handle);
-	int32_t need_initialise;
-//	getHost()->allocateSharedMemory(name, (void**) &currentVoice_, -1, sizeof(currentVoice_) / sizeof(float), need_initialise);
-	getHost()->allocateSharedMemory(name, (void**) &currentVoice_, -1, sizeof(currentVoice_), need_initialise);
-	*currentVoice_ = 0;
-#endif
-/*
-	if( getSampleRate() > 50000.f )
-	{
-		captureSamples = SCOPE_BUFFER_SIZE * 4;
-	}
-	else
-	{
-*/
 		captureSamples = SCOPE_BUFFER_SIZE;
-//	}
 
 	return gmpi::MP_OK;
 }
@@ -129,7 +106,8 @@ void Scope3::subProcess(int bufferOffset, int sampleFrames)
 
 	int remain = sampleFrames - count;
 
-	if( channelActive_[0] )
+//	if( channelActive_[0] )
+	if (channelsleepCount_[0] > 0)
 	{
 		int i = index_;
 		for(int c = count ; c > 0 ;c--)
@@ -138,7 +116,8 @@ void Scope3::subProcess(int bufferOffset, int sampleFrames)
 			resultsA_[i++] = *signalA++;
 		}
 	}
-	if( channelActive_[1] )
+//	if( channelActive_[1] )
+	if (channelsleepCount_[1] > 0)
 	{
 		int i = index_;
 		for(int c = count ; c > 0 ;c--)
@@ -178,9 +157,6 @@ void Scope3::forceTrigger()
 
 void Scope3::sendResultToGui(int block_offset)
 {
-#if defined( SE_TARGET_WAVES)
-	if( *currentVoice_ == this )
-#endif
 	{
 		/*
 		if( captureSamples > SCOPE_BUFFER_SIZE * 2 ) // oversampling? If so compress timescale.
@@ -206,52 +182,53 @@ void Scope3::sendResultToGui(int block_offset)
 		*/
 		const int datasize = SCOPE_BUFFER_SIZE * sizeof(resultsA_[0]);
 
-		if (channelActive_[0]) // avoid flodding que with unchanging values.
+		if (channelsleepCount_[0] > 0)
 		{
 			pinSamplesA.setValueRaw( datasize, &resultsA_ );
 			pinSamplesA.sendPinUpdate( block_offset );
 		}
-		else
-		{
-			pinSamplesA.setValueRaw(0, &resultsA_);
-			pinSamplesA.sendPinUpdate(block_offset);
-		}
 
-		if (channelActive_[1])
+		if(channelsleepCount_[1] > 0)
 		{
 			pinSamplesB.setValueRaw(datasize, &resultsB_);
 			pinSamplesB.sendPinUpdate(block_offset);
 		}
-		else
-		{
-			pinSamplesB.setValueRaw(0, &resultsA_);
-			pinSamplesB.sendPinUpdate(block_offset);
-		}
 	}
 
-	// waste of CPU to send updates more often than GUI can repaint,
-	// wait approx 1/10th seccond between captures.
-	timeoutCount_ = (int)getSampleRate() / 10;
-	SET_PROCESS(&Scope3::subProcessCruise);
-
-	channelActive_[0] = pinSignalA.isStreaming();
-	channelActive_[1] = pinSignalB.isStreaming();
-
-	// if inputs arn't changing, we can sleep.
-	if( sleepCount > 0 )
+	if (!pinSignalA.isStreaming())
 	{
-		if( --sleepCount == 0 )
-		{
-			SET_PROCESS(&Scope3::subProcessNothing);
-//			setSleep( true );
-		}
+		--channelsleepCount_[0];
 	}
+	if (!pinSignalB.isStreaming())
+	{
+		--channelsleepCount_[1];
+	}
+
+	if (channelsleepCount_[0] <= 0 && channelsleepCount_[1] <= 0 && !getTriggerPin()->isStreaming())
+	{
+		SET_PROCESS(&Scope3::subProcessNothing);
+		setSleep(true);
+	}
+	else
+	{
+		// waste of CPU to send updates more often than GUI can repaint,
+		// wait approx 1/10th seccond between captures.
+		timeoutCount_ = (int)getSampleRate() / 10;
+		SET_PROCESS(&Scope3::subProcessCruise);
+	}
+
+	index_ = 0; // ensure we are ready for next capture cycle, even if subProcessCruise gets bypassed by suspend/resume.
 }
 
-void Scope3::onSetPins(void)  // one or more pins_ updated.  Check pin update flags to determin which ones.
+void Scope3::onSetPins()  // one or more pins_ updated.  Check pin update flags to determin which ones.
 {
-//	setSleep( false );
+	if (pinSignalA.isUpdated())
+		channelsleepCount_[0] = 2; // need to send at least 2 captures to ensure flat-line signal captured.
 
+	if (pinSignalB.isUpdated())
+		channelsleepCount_[1] = 2;
+
+	/*
 	if( pinSignalA.isStreaming() || pinSignalB.isStreaming() || getTriggerPin()->isStreaming() )
 	{
 		sleepCount = -1; // indicates no sleep.
@@ -272,6 +249,7 @@ void Scope3::onSetPins(void)  // one or more pins_ updated.  Check pin update fl
 	{
 		channelActive_[1] = true;
 	}
+	*/
 
 	// Avoid resetting capture unless module is actually asleep.
 	if( getSubProcess() == &Scope3::subProcessNothing )
@@ -298,13 +276,9 @@ void Scope3::onSetPins(void)  // one or more pins_ updated.  Check pin update fl
 //			setSleep( true );
 		}
 
-#if defined( SE_TARGET_WAVES)
-		if( pinVoiceActive > 0.0f )
-		{
-			*currentVoice_ = this;
-		}
-#endif
 	}
+
+	setSleep(false);
 }
 
 

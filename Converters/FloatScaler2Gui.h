@@ -1,7 +1,7 @@
 #ifndef FLOATSCALER2GUI_H_INCLUDED
 #define FLOATSCALER2GUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 
 class FloatScaler2Gui : public MpGuiBase
 {

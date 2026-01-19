@@ -10,8 +10,8 @@ class MidiLogger : public MpBase
 public:
 	MidiLogger( IMpUnknown* host );
 	~MidiLogger();
-	virtual void onSetPins(void);
-	virtual void onMidiMessage( int pin, unsigned char* midiMessage, int size );
+	void onSetPins() override;
+	void onMidiMessage( int pin, unsigned char* midiMessage, int size ) override;
 	void subProcess( int bufferOffset, int sampleFrames );
 
 private:

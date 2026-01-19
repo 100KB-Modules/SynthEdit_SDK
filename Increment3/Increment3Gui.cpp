@@ -4,18 +4,11 @@
 
 REGISTER_GUI_PLUGIN(Increment3Gui, L"SynthEdit Increment3");
 REGISTER_GUI_PLUGIN(Increment3Gui, L"SE Increment3B");
+SE_DECLARE_INIT_STATIC_FILE(Increment3_Gui);
 
 Increment3Gui::Increment3Gui(IMpUnknown* host) : MpGuiBase(host)
 {
-	// initialise pins
-/* old
-	choice.initialize( this, 0 );
-	itemList.initialize( this, 1 );
-	increment.initialize( this, 2, static_cast<MpGuiBaseMemberPtr>(&Increment3Gui::onSetIncrement) );
-	decrement.initialize( this, 3, static_cast<MpGuiBaseMemberPtr>(&Increment3Gui::onSetDecrement) );
-	wrap.initialize( this, 4 );
-*/
-	initializePin( 0, choice );
+	initializePin( 0, choice);
 	initializePin( 1, itemList );
 	initializePin( 2, increment, static_cast<MpGuiBaseMemberPtr>( &Increment3Gui::onSetIncrement ) );
 	initializePin( 3, decrement, static_cast<MpGuiBaseMemberPtr>( &Increment3Gui::onSetDecrement ) );
@@ -24,18 +17,43 @@ Increment3Gui::Increment3Gui(IMpUnknown* host) : MpGuiBase(host)
 
 void Increment3Gui::onSetIncrement()
 {
-	if(!increment)
+	if (prev_increment != increment)
 	{
-		nextValue( 1 );
+		if (increment)
+		{
+			valueOnMouseDown = choice;
+		}
+		else
+		{
+			// If the value was already incremented by annother view (because module appears on more than one view), don't double-increment.
+			if (valueOnMouseDown == choice)
+			{
+				nextValue(1);
+			}
+		}
 	}
+
+	prev_increment = increment;
 }
 
 void Increment3Gui::onSetDecrement()
 {
-	if(!decrement)
+	if(prev_decrement != decrement)
 	{
-		nextValue( -1 );
+		if (decrement)
+		{
+			valueOnMouseDown = choice;
+		}
+		else
+		{
+			if (valueOnMouseDown == choice)
+			{
+				nextValue(-1);
+			}
+		}
 	}
+
+	prev_decrement = decrement;
 }
 
 void Increment3Gui::nextValue( int direction )
@@ -76,14 +94,14 @@ void Increment3Gui::nextValue( int direction )
 
 	if( direction == 1  ) // increment
 	{
-		if( cur_idx == last_idx && wrap )
+		if( (cur_idx == last_idx) && wrap )
 			next_idx = first_idx;
 
 		choice = next_idx;
 	}
 	else // decrement
 	{
-		if( cur_idx == first_idx && wrap )
+		if( (cur_idx == first_idx) && wrap )
 			prev_idx = last_idx;
 
 		choice = prev_idx;

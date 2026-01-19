@@ -19,6 +19,7 @@ void PatchcableDiagGui::onSetPatchcableXml()
 	// get the XML describing the patch cables
 	RawView raw(pinPatchCableXml.rawData(), (size_t) pinPatchCableXml.rawSize());
 
+#if 0
 	// HOW TO MODIFY PATCH CABLES
 	{
 		// Convert to a handy vector
@@ -33,6 +34,7 @@ void PatchcableDiagGui::onSetPatchcableXml()
 		MpBlob newValue(modifiedRaw.size(), modifiedRaw.data());
 		pinPatchCableXml = newValue;
 	}
+#endif
 
 	invalidateRect();
 }

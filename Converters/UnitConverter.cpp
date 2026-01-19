@@ -2,7 +2,14 @@
 #include <math.h>
 #include <algorithm>
 #include "../shared/fastmaths.h"
+#include "../shared/xp_simd.h"
+
+#if GMPI_USE_SSE
 #include "fastmath/fmath.h"
+#endif
+
+SE_DECLARE_INIT_STATIC_FILE(UnitConverter)
+SE_DECLARE_INIT_STATIC_FILE(UnitConverterVolts)
 
 using namespace std;
 
@@ -17,7 +24,7 @@ UnitConverter::UnitConverter( IMpUnknown* host ) : MpBase( host )
 	initializePin( 2, pinMode );
 }
 
-void UnitConverter::onSetPins(void)
+void UnitConverter::onSetPins()
 {
 	const float verySmallNumber = 1E-6f;
 
@@ -172,7 +179,7 @@ UnitConverterVolts::UnitConverterVolts()
 }
 /*
 // http://fastapprox.googlecode.com/svn/trunk/fastapprox/src/fastonebigheader.h
-static inline float
+sta tic inline float
 fastlog2(float x)
 {
 	// !!! INTEL COMPILER BUG, AVOID !!!!!! (aliased pointers, use code below instead)
@@ -201,13 +208,13 @@ fastlog2j(float x) // log base-2
 		- 1.72587999f / ( 0.3520887068f + mxf );
 }
 
-static inline float
+sta tic inline float
 fastlog(float x)
 {
 	return 0.69314718f * fastlog2j(x);
 }
 
-static inline float
+sta tic inline float
 fasterlog2(float x)
 {
 	union { float f; uint32_t i; } vx = { x };
@@ -216,7 +223,7 @@ fasterlog2(float x)
 	return y - 126.94269504f;
 }
 
-static inline float
+sta tic inline float
 fasterlog(float x)
 {
 	//  return 0.69314718f * fasterlog2 (x);
@@ -230,48 +237,27 @@ fasterlog(float x)
 
 void UnitConverterVolts::subProcessHzToVolts(int sampleFrames)
 {
+    const float HzMin = 0.00000001f;
+
+#if !GMPI_USE_SSE
+    auto signalIn = getBuffer(pinSignalIn);
+    auto signalOut = getBuffer(pinSignalOut);
+
+    while (sampleFrames-- > 0)
+	{
+		*signalOut++ = hz_to_volts_const2 * (log((std::max)(HzMin, *signalIn++)) + hz_to_volts_const1);
+	}
+
+#else // SSE Version.
+
 	// get pointers to in/output buffers.
 	__m128* signalIn = reinterpret_cast<__m128*>(getBuffer(pinSignalIn));
 	__m128* signalOut = reinterpret_cast<__m128*>(getBuffer(pinSignalOut));
 
-	const float HzMin = 0.00000001f;
-
-#if 0
-	for( int s = sampleFrames; s > 0; --s )
-	{
-		float kHz = *signalIn;
-		if( kHz < HzMin ) // to prevent divide-by-zero approximate 0kHz as 0.001 Hz.
-		{
-			kHz = HzMin;
-		}
-
-		{
-			//		*signalOut = 0.1f * (logf(kHz) + logf(10.0f * 1000.0f / 440.0f)) / logf(2.0f) + 0.5f; // full formular. Constants represent 440 Hz and 5 Volts.
-			*signalOut = const2 * (log(kHz) + const1);
-		}
-
-		// Increment buffer pointers.
-		++signalIn;
-		++signalOut;
-	}
-#else
-	// SSE Version.
-
-	// Process remaining samples in groups of 4.
+	// Process samples in groups of 4.
 	const __m128 const1_SSE = _mm_set_ps1(hz_to_volts_const1);
 	const __m128 const2_SSE = _mm_set_ps1(hz_to_volts_const2);
 	const __m128 HzMin_SSE = _mm_set_ps1(HzMin);
-
-#if 0
-	// process fiddly non-sse-aligned prequel.
-	while (((int)signalOut) & 0x0f)
-	{
-		*signalOut++ = const2 * (log((std::max)(HzMin, *signalIn++)) + const1);
-		--sampleframes;
-	}
-	__m128* pIn1 = (__m128*) signalIn;
-	__m128* pDest = (__m128*) signalOut;
-#else
 
 	// process non-sse-aligned prequel.
 	if (((intptr_t)signalOut) & 0x0f)
@@ -283,8 +269,6 @@ void UnitConverterVolts::subProcessHzToVolts(int sampleFrames)
 		signalOut = (__m128*)(((float*)signalOut) + processed);
 		sampleFrames -= processed;
 	}
-
-#endif
 
 	while (sampleFrames > 0)
 	{
@@ -414,7 +398,6 @@ void UnitConverterVolts::subProcessVcaToDb(int sampleFrames)
 	float* signalOut = getBuffer(pinSignalOut);
 
 	const float timeconstants = 3.0f;
-	const float c1 = 1.0f / (1.0f - expf(-timeconstants));      //  scale factor truncated curve
 	constexpr float thrtyfiveovernine = 35.0f / 9.0f;
 
 	for (int s = sampleFrames; s > 0; --s)
@@ -486,7 +469,7 @@ void UnitConverterVolts::subProcessExpToDb(int sampleFrames)
 	}
 }
 
-void UnitConverterVolts::onSetPins(void)
+void UnitConverterVolts::onSetPins()
 {
 	pinSignalOut.setStreaming(pinSignalIn.isStreaming());
 
@@ -522,6 +505,10 @@ void UnitConverterVolts::onSetPins(void)
 int32_t UnitConverterVolts::open()
 {
 #ifdef UNITCONVERTER_VOLTS_USE_LOOKUP
+	// fix for race conditions.
+	static std::mutex safeInit;
+	std::lock_guard<std::mutex> lock(safeInit);
+
 	// table method, not good.
 	int32_t needInitialize;
 	const int tableSize = LOOKUP_SIZE + 4; // extras for interpolator.

@@ -5,7 +5,7 @@
 #include "ViewBase.h"
 #include "modules/se_sdk3_hosting/gmpi_gui_hosting.h"
 #include "IPluginGui.h"
-#include "../SE_DSP_CORE/IGuiHost2.h"
+#include "IGuiHost2.h"
 #include "../shared/xplatform_modifier_keys.h"
 #include "BundleInfo.h"
 
@@ -115,6 +115,7 @@ public:
 	{}
 	void DragSelection(GmpiDrawing_API::MP1_SIZE offset) override
 	{}
+	void NotDragging() override {}
 
 	virtual IPresenter* CreateSubPresenter(int32_t containerHandle) override
 	{
@@ -365,6 +366,7 @@ public:
 
 		view->UpdateCablesBounds();
 	}
+	void NotDragging() override {}
 
 	IPresenter* CreateSubPresenter(int32_t containerHandle) override
 	{

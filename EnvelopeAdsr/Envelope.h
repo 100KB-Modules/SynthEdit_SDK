@@ -1,11 +1,13 @@
 #pragma once
 #include "../se_sdk3/mp_sdk_audio.h"
+
 #define FAST_DECAY_SAMPLES 15
+
 class EnvelopeBase : public MpBase
 {
 public:
 	EnvelopeBase( IMpUnknown* host );
-	virtual int32_t MP_STDCALL open();
+	int32_t MP_STDCALL open() override;
 	void OnGateChange( int blockPosition, float gate, float trigger );
 	virtual void ChooseSubProcess( int blockPosition ) = 0;
 	void sub_process( int start_pos, int sampleframes );
@@ -48,7 +50,7 @@ class Envelope : public EnvelopeBase
 public:
 	Envelope( IMpUnknown* host );
 	inline float CalcIncrement( float p_rate );
-	virtual void onSetPins( void );
+	void onSetPins( void ) override;
 	void ChooseSubProcess( int blockPosition );
 	void sub_process5( int start_pos, int sampleframes );
 	void sub_process8( int start_pos, int sampleframes );

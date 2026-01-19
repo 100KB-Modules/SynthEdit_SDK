@@ -8,8 +8,8 @@ class UnisonFix : public MpBase, public hasMidiTuning
 {
 public:
 	UnisonFix( IMpUnknown* host );
-	virtual void onMidiMessage(int pin, unsigned char* midiMessage, int size); // size < 4 for short msg, or > 4 for sysex
-	virtual void OnKeyTuningChanged(int p_clock, int MidiNoteNumber, int tune) override;
+	void onMidiMessage(int pin, unsigned char* midiMessage, int size) override; // size < 4 for short msg, or > 4 for sysex
+	void OnKeyTuningChanged(int p_clock, int MidiNoteNumber, int tune) override;
 
 private:
 	MidiInPin pinMIDIIn;

@@ -15,6 +15,8 @@ const int TBL_SIZE = 1024;
 const int TBL_SIZE_M_1 = TBL_SIZE - 1;
 const int HALF_TBL_SIZE = TBL_SIZE / 2; // split +/-
 
+// Waves only
+SE_DECLARE_INIT_STATIC_FILE(SoftDistortion);
 
 REGISTER_PLUGIN ( SoftDistortion, L"dehaupt DH_SoftDist 1.2J" );
 
@@ -29,7 +31,7 @@ SoftDistortion::SoftDistortion( IMpUnknown* host ) : MpBase( host )
 }
 
 
-void SoftDistortion::onSetPins(void)
+void SoftDistortion::onSetPins()
 {
 	bool OutputIsActive = pinSignalIn.isStreaming();
 

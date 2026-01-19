@@ -1,7 +1,7 @@
 #ifndef INCREMENT3GUI_H_INCLUDED
 #define INCREMENT3GUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 
 class Increment3Gui : public MpGuiBase
 {
@@ -18,6 +18,12 @@ private:
  	BoolGuiPin increment;
  	BoolGuiPin decrement;
  	BoolGuiPin wrap;
+
+    // prevent initial 'false' value from triggering inc/dec.
+    bool prev_increment = {};
+    bool prev_decrement = {};
+
+    int valueOnMouseDown = {};
 };
 
 #endif

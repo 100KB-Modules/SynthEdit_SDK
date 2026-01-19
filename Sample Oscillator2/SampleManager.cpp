@@ -1,6 +1,7 @@
-//#include "windows.h"
 #include "SampleManager.h"
 #include "assert.h"
+#include "../../mfc_emulation.h"
+#include "../shared/unicode_conversion.h"
 
 SampleManager* SampleManager::Instance()
 {
@@ -22,7 +23,7 @@ SampleManager::~SampleManager()
 	}
 }
 
-int SampleManager::Load( gmpi::IProtectedFile *file, const wchar_t* filename, int bank, int patch )
+int SampleManager::Load( gmpi::IProtectedFile2 *file, const wchar_t* filename, int bank, int patch )
 {
 	const int channel = 0;
 	CSoundFont* soundfontData = 0;
@@ -81,21 +82,18 @@ int SampleManager::Load( gmpi::IProtectedFile *file, const wchar_t* filename, in
 	si->patch = patch;
 	si->patchData = patchData;
 
-	//soundfonts[freeHandle] = soundfont;
 	soundfonts.insert( std::pair<int , sample_info*>(freeHandle, si ) );
 
-//	_RPTW2(_CRT_WARN, L"SampleManager::Load( '%s' ) handle=%d\n", filename, freeHandle );
+#ifdef _DEBUG
+{
+    auto filenameUtf8 = JmUnicodeConversions::WStringToUtf8(filename);
+	_RPT2(_CRT_WARN, "SampleManager::Load( '%s' ) handle=%d\n", filenameUtf8.c_str(), freeHandle );
+}
+#endif
 
 	return freeHandle;
 }
 
-/*
-void SampleManager::SetProgram( int sampleHandle, short channel, int bank, int patch )
-{
-	soundfonts[sampleHandle]->SetProgram( channel, patch );
-	soundfonts[sampleHandle]->SetBank( channel, bank );
-}
-*/
 void SampleManager::GetPlayingZones( int sampleHandle, short p_chan, short p_note, short p_vel, activeZoneListType &returnZones)
 {
 	soundfontContainer_t::iterator it = soundfonts.find( sampleHandle );
@@ -143,26 +141,28 @@ int SampleManager::Release( int sampleHandle )
 	if( sampleHandle < 0 )
 		return 0;
 
+	_RPT1(_CRT_WARN, "SampleManager::Release() handle=%d\n", sampleHandle );
+
 	soundfontContainer_t::iterator it = soundfonts.find( sampleHandle );
 	if( it != soundfonts.end() )
 	{
-//		_RPTW1(_CRT_WARN, L"SampleManager::Unload() handle=%d\n", sampleHandle );
-
 		sample_info* si = (*it).second;
 		int refcount = si->patchData->Release();
 		if( refcount == 0 )
 		{
-//			_RPTW0(_CRT_WARN, L"  DELETED\n" );
+			_RPT0(_CRT_WARN, "  DELETED\n" );
 			delete si;
 			soundfonts.erase( it );
 		}
 		else
 		{
-//			_RPTW1(_CRT_WARN, L"  Refcount = %d\n", refcount );
+			_RPT1(_CRT_WARN, "  Refcount = %d\n", refcount );
 		}
 
 		return refcount;
 	}
+
+	_RPT0(_CRT_WARN, "  not found!\n" );
 
 	return -1;
 }

@@ -1,11 +1,30 @@
-#include ".\UserSettingText.h"
+#include "../se_sdk3/mp_sdk_audio.h"
 
-REGISTER_PLUGIN ( UserSettingText, L"SE UserSettingText" );
+using namespace gmpi;
 
-UserSettingText::UserSettingText( IMpUnknown* host ) : MpBase( host )
+class UserSettingText : public MpBase2
 {
-	// Register pins.
-	initializePin( 0, pinValueOut );
+	StringInPin pinvaluein;
+	StringOutPin pinValue;
+
+public:
+	UserSettingText()
+	{
+		initializePin(pinvaluein);
+		initializePin(pinValue);
+	}
+
+	void onSetPins() override
+	{
+		if (pinvaluein.isUpdated())
+		{
+			pinValue = pinvaluein;
+		}
+	}
+};
+
+namespace
+{
+	auto r = Register<UserSettingText>::withId(L"SE UserSettingText");
 }
-
-
+SE_DECLARE_INIT_STATIC_FILE(UserSettingText);

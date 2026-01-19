@@ -25,55 +25,21 @@ int32_t TextSubcontrol::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingConte
 	else
 		brush.SetColor(textdata->getColor());
 
-	textformat.SetTextAlignment(textdata->getTextAlignment());
-
-	auto directXOffset = textdata->getLegacyVerticalOffset();
-	textRect.top += directXOffset;
-	textRect.bottom += directXOffset;
+	if(textdata->verticalSnapBackwardCompatibilityMode)
+	{
+		auto directXOffset = textdata->getLegacyVerticalOffset();
+		textRect.top += directXOffset;
+		textRect.bottom += directXOffset;
+	}
 
 	g.DrawTextU(getDisplayText(), textformat, textRect, brush, (int32_t)DrawTextOptions::Clip);
-
-#if 0 // TextEntry3 didn't draw arrow.
-	// Divide control into text display and drop-down button.
-	float dropDownArrowRight = r.right - fontSize * 2.0f;
-
-	textRect.right = dropDownArrowRight - border;
-
-	// Drop-down indicator 'arrow'.
-	brush->SetColor(&Color::FromBytes(110, 110, 110));
-	{
-		const float penWidth = 2;
-
-		gmpi_sdk::mp_shared_ptr<GmpiDrawing_API::IMpFactory> factory;
-		dc->GetFactory(&factory.get());
-
-		gmpi_sdk::mp_shared_ptr<IMpPathGeometry> geometry;
-		factory->CreatePathGeometry(&geometry.get());
-
-		gmpi_sdk::mp_shared_ptr<IMpGeometrySink> sink;
-		geometry->Open(&sink.get());
-
-		GmpiDrawing::Point p(dropDownArrowRight, r.getHeight() * 0.5f - fontSize * 0.25f);
-
-		sink->BeginFigure(p, MP1_FIGURE_BEGIN_HOLLOW);
-		p.x += fontSize * 0.5f;
-		p.y += fontSize * 0.5f;
-		sink->AddLine(p);
-		p.x += fontSize * 0.5f;
-		p.y -= fontSize * 0.5f;
-		sink->AddLine(p);
-
-		sink->EndFigure(MP1_FIGURE_END_OPEN);
-		sink->Close();
-		dc->DrawGeometry(geometry, brush, penWidth);
-	}
-#endif
 
 	return gmpi::MP_OK;
 }
 
 void TextSubcontrol::onSetStyle()
 {
+	invalidateRect();
 	getGuiHost()->invalidateMeasure();
 }
 
@@ -86,7 +52,25 @@ int32_t TextSubcontrol::populateContextMenu(float x, float y, gmpi::IMpUnknown* 
 
 	for (itr.First(); !itr.IsDone(); ++itr)
 	{
-		sink->AddItem(WStringToUtf8(itr.CurrentItem()->text).c_str(), itr.CurrentItem()->value);
+		int32_t flags = 0;
+
+		// Special commands (sub-menus)
+		switch (itr.CurrentItem()->getType())
+		{
+			case enum_entry_type::Separator:
+			case enum_entry_type::SubMenu:
+				flags |= gmpi_gui::MP_PLATFORM_MENU_SEPARATOR;
+				break;
+
+			case enum_entry_type::SubMenuEnd:
+			case enum_entry_type::Break:
+				continue;
+
+			default:
+				break;
+		}
+
+		sink->AddItem(WStringToUtf8(itr.CurrentItem()->text).c_str(), itr.CurrentItem()->value, flags);
 	}
 	return gmpi::MP_OK;
 }

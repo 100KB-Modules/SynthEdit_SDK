@@ -10,13 +10,13 @@ ImageToFrameGui::ImageToFrameGui(IMpUnknown* host) : MpGuiBase(host)
 	frameNumber.initialize( this, 2, static_cast<MpGuiBaseMemberPtr>(&ImageToFrameGui::OnSetFrameNumber));
 }
 
-void ImageToFrameGui::OnSetAnimationPosition(void)
+void ImageToFrameGui::OnSetAnimationPosition()
 {
 	float next_idx = 0.5f + animationPosition * ( frameCount -1.0f );
 	frameNumber = (int) next_idx;
 }
 
-void ImageToFrameGui::OnSetFrameNumber(void)
+void ImageToFrameGui::OnSetFrameNumber()
 {
 	int last_frame = frameCount - 1;
 	if( last_frame < 1 ) // prevent divide-by-zero

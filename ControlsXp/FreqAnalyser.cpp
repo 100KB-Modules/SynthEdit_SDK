@@ -4,6 +4,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
+SE_DECLARE_INIT_STATIC_FILE(FreqAnalyser2)
 REGISTER_PLUGIN2(FreqAnalyser, L"SE Freq Analyser2");
 
 /* TODO !!!
@@ -17,6 +18,7 @@ index_( 0 )
 	initializePin(pinSamplesA);
 	initializePin(pinSignalA);
 	initializePin(pinCaptureSize);
+	initializePin(pinUpdateRate);
 }
 
 int32_t FreqAnalyser::open()
@@ -51,22 +53,6 @@ void FreqAnalyser::subProcess(int sampleFrames)
 		assert(index_ < captureSamples);
 		resultsA_[index_] = *signala++;
 	}
-/*
-	int count = captureSamples - index_;
-	if(count > sampleFrames)
-		count = sampleFrames;
-
-	int remain = sampleFrames - count;
-
-	int i = index_;
-	for(int c = count ; c >= 0 ; c--)
-	{
-		assert( i < captureSamples );
-		resultsA_[i++] = *signala++;
-	}
-
-	index_ += count;
-*/
 
 	if(index_ == captureSamples )
 	{
@@ -112,6 +98,7 @@ void FreqAnalyser::sendResultToGui(int block_offset)
 	const int datasize = (1 + resultsA_.size() / 2 ) * sizeof(resultsA_[0]);
 
 	// Add an extra member communicating sample-rate to GUI.
+	// !! overwrites nyquist value?
 	resultsA_[resultsA_.size() / 2] = getSampleRate();
 
 	pinSamplesA.setValueRaw( datasize, resultsA_.data() );
@@ -119,7 +106,7 @@ void FreqAnalyser::sendResultToGui(int block_offset)
 
 	// waste of CPU to send updates more often than GUI can repaint,
 	// wait approx 1/10th second between captures.
-	timeoutCount_ = (int)getSampleRate() / 10;
+	timeoutCount_ = (std::max)(100, ((int)getSampleRate() - pinCaptureSize.getValue()) / (std::max)(1, pinUpdateRate.getValue()));
 	setSubProcess(&FreqAnalyser::waitAwhile);
 
 	// if inputs aren't changing, we can sleep.
@@ -133,12 +120,13 @@ void FreqAnalyser::sendResultToGui(int block_offset)
 	}
 }
 
-void FreqAnalyser::onSetPins(void)  // one or more pins_ updated.  Check pin update flags to determine which ones.
+void FreqAnalyser::onSetPins()  // one or more pins_ updated.  Check pin update flags to determine which ones.
 {
 	setSleep( false );
 
 	if (pinCaptureSize.isUpdated())
 	{
+		index_ = 0;
 		captureSamples = pinCaptureSize;
 		resultsA_.assign(captureSamples, 0.0f);
 

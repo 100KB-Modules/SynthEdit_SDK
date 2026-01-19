@@ -1,7 +1,10 @@
-#include "../se_sdk3/mp_sdk_audio.h"
 #include <vector>
+#include "../se_sdk3/mp_sdk_audio.h"
+#include "../se_sdk3/mp_midi.h"
 
 using namespace gmpi;
+
+SE_DECLARE_INIT_STATIC_FILE(KeyboardMidi);
 
 class KeyboardMidi : public MpBase2
 {
@@ -14,16 +17,27 @@ class KeyboardMidi : public MpBase2
 	};
 
 	std::vector< SimpleMidiMessage > buffer;
+	gmpi::midi_2_0::MidiConverter2 midiConverter;
 
 public:
-	KeyboardMidi()
+	KeyboardMidi() :
+		// init the midi converter
+		midiConverter(
+			// provide a lambda to accept converted MIDI 2.0 messages
+			[this](const midi::message_view& msg, int offset)
+			{
+				pinMIDIOut.send(msg.begin(), msg.size(), offset);
+			}
+		)
 	{
 		initializePin( pinChannel );
 		initializePin( pinMIDIOut );
+
+		buffer.reserve(20);
 	}
 
 	// 'Backdoor' to UI class.  Not recommended. WARNING: Called outside scope of Process function, you can't set pins or send MIDI during this call.
-	virtual int32_t MP_STDCALL receiveMessageFromGui(int32_t id, int32_t size, const void* messageData) override
+	int32_t MP_STDCALL receiveMessageFromGui(int32_t id, int32_t size, const void* messageData) override
 	{
 		if (size == 3)
 		{
@@ -43,9 +57,9 @@ public:
 	void subProcess(int sampleFrames)
 	{
 		int timeStamp = 0;
-		for( auto msg : buffer)
+		for (auto msg : buffer)
 		{
-			pinMIDIOut.send(msg.data, sizeof(msg.data), timeStamp++);
+			midiConverter.processMidi({msg.data, sizeof(msg.data)}, getBlockPosition() + timeStamp++);
 
 			if (timeStamp >= sampleFrames)
 				return;
@@ -54,7 +68,7 @@ public:
 		buffer.clear();
 	}
 
-	virtual void onSetPins(void) override
+	void onSetPins() override
 	{
 		setSubProcess(&KeyboardMidi::subProcess);
 

@@ -22,11 +22,12 @@ private:
  	StringGuiPin pinText;
 
 	GmpiDrawing::Bitmap bitmap_;
-	GmpiDrawing::TextFormat textFormat_;
+	GmpiDrawing::TextFormat_readonly textFormat_;
 	ImageMetadata* bitmapMetadata_;
-	FontMetadata* textData;
+	const FontMetadata* textData;
 	GmpiDrawing::Size text_size;
 	std::string title_utf8;
+	float text_y = {};
 
 //	GmpiDrawing::Bitmap cachedRender_;
 	GmpiDrawing::RectL rTopLeft, rTopRight, rBottomRight, rBottomLeft, rVertical, rHorizontal, rleftEnd, rRightEnd;

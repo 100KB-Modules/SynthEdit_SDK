@@ -11,7 +11,10 @@ public:
 
 	void subProcess(int sampleFrames);
 	void subProcessStatic(int sampleFrames);
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
+
+protected:
+	virtual bool isHighPass() { return false; }
 
 private:
 	AudioInPin pinSignal;
@@ -23,6 +26,12 @@ private:
 	std::vector<float>hist;
 
 	int staticCount;
+};
+
+class SincFilterHp : public SincFilterLpHp
+{
+protected:
+	bool isHighPass() override{ return true; }
 };
 
 #endif

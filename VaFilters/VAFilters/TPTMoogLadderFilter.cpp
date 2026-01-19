@@ -1,11 +1,11 @@
 #include "TPTMoogLadderFilter.h"
 
-CTPTMoogLadderFilter::CTPTMoogLadderFilter(void)
+CTPTMoogLadderFilter::CTPTMoogLadderFilter()
 {
 //	zMinusOneRegister = 0.0;
 }
 
-CTPTMoogLadderFilter::~CTPTMoogLadderFilter(void)
+CTPTMoogLadderFilter::~CTPTMoogLadderFilter()
 {
 }
 

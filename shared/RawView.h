@@ -52,6 +52,13 @@ public:
 		value = v;
 	}
 
+	// conversion back to types.
+	template <typename T>
+	explicit operator T() const { assert(size() == sizeof(T));  return *reinterpret_cast<const T*>(data()); }
+
+	explicit operator std::string() const { std::string r(reinterpret_cast<const char*>(data()), size()); return r; }
+	explicit operator std::wstring() const { std::wstring r(reinterpret_cast<const wchar_t*>(data()), size() / sizeof(wchar_t)); return r; }
+
 	RawData& assign(const char* data, size_t size)
 	{
 		value.assign(data, size);
@@ -87,7 +94,7 @@ public:
 	RawView(const std::string& v) : data_(v.data()), size_(v.size() * sizeof(v[0])) {}
 	RawView(const std::wstring& v) : data_(v.data()), size_(v.size() * sizeof(v[0])) {}
 	RawView(const char* v) : data_(v), size_(strlen(v)) {}
-	RawView(RawData& v) : data_(v.data()), size_(v.size()) {}
+	RawView(const RawData& v) : data_(v.data()), size_(v.size()) {}
 
 	// conversion back to types.
 	template <typename T>

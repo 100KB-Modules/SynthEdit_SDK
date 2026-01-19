@@ -2,13 +2,14 @@
 #include <algorithm>
 #include "../se_sdk3/mp_sdk_gui2.h"
 #include "it_enum_list.h"
+#include <climits>
 
 using namespace gmpi;
 
 class ListToAnimationGui : public SeGuiInvisibleBase
 {
 	std::vector<int> listValues;
-	int currentValue;
+	int currentValue = INT_MIN; // unlikely initial value.
 
 	void onSetInput()
 	{
@@ -48,6 +49,7 @@ class ListToAnimationGui : public SeGuiInvisibleBase
 			listValues.push_back(0);
 		}
 
+		currentValue = INT_MIN; // current output is invalidated.
 		onSetInput();
 	}
 
@@ -66,8 +68,7 @@ class ListToAnimationGui : public SeGuiInvisibleBase
 	FloatGuiPin pinAnimationPosition;
 
 public:
-	ListToAnimationGui() :
-		currentValue(0)
+	ListToAnimationGui()
 	{
 		initializePin(pinChoice, static_cast<MpGuiBaseMemberPtr2>(&ListToAnimationGui::onSetInput));
 		initializePin(pinItemList, static_cast<MpGuiBaseMemberPtr2>(&ListToAnimationGui::onSetList));

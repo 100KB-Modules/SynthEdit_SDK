@@ -1,6 +1,7 @@
 #include "PatchMemoryTextOutGui.h"
 
 REGISTER_GUI_PLUGIN( PatchMemoryTextOutGui, L"SE PatchMemory Text Out" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryTextOut_Gui);
 
 // handy macro to save typing.
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryTextOutGui::on##name##Changed ) );

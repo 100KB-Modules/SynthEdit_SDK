@@ -15,7 +15,7 @@ void Slider2::subProcess( int sampleFrames )
 	pinValueOut.subProcess(getBlockPosition(), sampleFrames, canSleep);
 }
 
-void Slider2::onSetPins(void)
+void Slider2::onSetPins()
 {
 	pinValueOut = 0.1f * pinValueIn; // 1 V = 0.1 audio.
 

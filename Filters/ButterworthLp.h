@@ -4,6 +4,8 @@
 #include "./DspFilters/Butterworth.h"
 #include "../shared/FilterBase.h"
 
+// newer version of filters: https://github.com/berndporr/iir1
+
 template <typename FilterClass>
 class DspFilterBase : public FilterBase
 {
@@ -17,12 +19,14 @@ protected:
 
 public:
 	// Support for FilterBase
-	virtual void StabilityCheck() override {}
-	virtual bool isFilterSettling() override
+	void StabilityCheck() override
+	{
+	}
+	bool isFilterSettling() override
 	{
 		return !pinSignal.isStreaming();
 	}
-	virtual AudioOutPin& getOutputPin() override
+	AudioOutPin& getOutputPin() override
 	{
 		return pinOutput;
 	}
@@ -37,7 +41,7 @@ public:
 	}
 
 	virtual void setupFilter() = 0;
-	void onSetPins(void) override
+	void onSetPins() override
 	{
 		setupFilter();
 
@@ -82,13 +86,13 @@ public:
 		MpBase2::initializePin(DspFilterBase<FilterClass>::pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
 		DspFilterBase<FilterClass>::filter.setup(DspFilterBase<FilterClass>::pinPoles, 1.0, DspFilterBase<FilterClass>::normalisedPitch());
 	}
 
 	// Support for FilterBase
-	virtual void StabilityCheck() override {}
+	void StabilityCheck() override {}
 };
 
 class ButterworthLp : public ButterworthBase< Dsp::SimpleFilter<Dsp::Butterworth::LowPass <12>, 1> > // 12 poles max, 1 channel.
@@ -114,7 +118,7 @@ public:
 		MpBase2::initializePin(DspFilterBase<FilterClass>::pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
 		// limit pitch range to legal values.
 		float normalisedWidth = (std::max)(0.01f, pinWidth.getValue()) / DspFilterBase<FilterClass>::getSampleRate();
@@ -124,11 +128,13 @@ public:
 			normalisedWidth = maxPitch;
 		}
 
-		DspFilterBase<FilterClass>::filter.setup(DspFilterBase<FilterClass>::pinPoles, 1.0, DspFilterBase<FilterClass>::normalisedPitch(), normalisedWidth);
+		DspFilterBase<FilterClass>::filter.setup(
+			DspFilterBase<FilterClass>::pinPoles.getValue()
+			, 1.0
+			, DspFilterBase<FilterClass>::normalisedPitch()
+			, normalisedWidth
+		);
 	}
-
-	// Support for FilterBase
-	virtual void StabilityCheck() override {}
 };
 
 /* made converter instead
@@ -201,7 +207,7 @@ public:
 		initializePin(pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
 		// limit pitch range to legal values.
 		float normalisedWidth = (std::max)(0.01f, pinWidth.getValue()) / getSampleRate();
@@ -213,11 +219,14 @@ public:
 
 //		float safeGain = (std::min)(300.0f, (std::max)(0.01f, pinGain.getValue()));
 
-		filter.setup(pinPoles, 1.0, normalisedPitch(), normalisedWidth, pinGain.getValue());
+		filter.setup(
+			pinPoles.getValue(),
+			1.0,
+			normalisedPitch(),
+			normalisedWidth,
+			pinGain.getValue()
+		);
 	}
-
-	// Support for FilterBase
-	virtual void StabilityCheck() override {}
 };
 
 template <typename FilterClass>
@@ -235,14 +244,11 @@ public:
 		MpBase2::initializePin(DspFilterBase<FilterClass>::pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
-        assert(pinGain.getValue() >= 0.0f); // Shelving filters can't have positive gain.
-		DspFilterBase<FilterClass>::filter.setup(DspFilterBase<FilterClass>::pinPoles, 1.0, DspFilterBase<FilterClass>::normalisedPitch(), pinGain.getValue());
+//?        assert(pinGain.getValue() <= 0.0f); // Shelving filters can't have positive gain.
+		DspFilterBase<FilterClass>::filter.setup(DspFilterBase< FilterClass >::pinPoles, 1.0, DspFilterBase<FilterClass>::normalisedPitch(), pinGain.getValue());
 	}
-
-	// Support for FilterBase
-	virtual void StabilityCheck() override {}
 };
 
 class ButterworthLowShelf : public ButterworthShelf< Dsp::SimpleFilter<Dsp::Butterworth::LowShelf <12>, 1> > // 12 poles max, 1 channel.
@@ -270,7 +276,7 @@ public:
 		initializePin(pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
 		filter.setup(pinPoles, 1.0, normalisedPitch(), pinRipple, pinRolloff);
 	}
@@ -293,7 +299,7 @@ public:
 		initializePin(pinOutput);
 	}
 
-	virtual void setupFilter() override
+	void setupFilter() override
 	{
 		filter.setup(pinPoles, 1.0, normalisedPitch(), pinRipple, pinRolloff);
 	}

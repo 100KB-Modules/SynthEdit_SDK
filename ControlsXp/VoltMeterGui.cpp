@@ -3,13 +3,14 @@
 #include <sstream>
 #include <memory>
 #include "Drawing.h"
-#include "TextWidget.h"
+#include "../sharedLegacyWidgets/TextWidget.h"
 
 using namespace std;
 using namespace gmpi;
 using namespace GmpiDrawing;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, VoltMeterGui, L"SE Volt Meter" );
+SE_DECLARE_INIT_STATIC_FILE(VoltMeter_Gui);
 
 VoltMeterGui::VoltMeterGui()
 {
@@ -26,8 +27,7 @@ void VoltMeterGui::onSetTitle()
 	widgets.push_back(w);
 
 	auto title = (std::string) pinTitle;
-	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str());
-	tw->setCentered();
+	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str(), true);
 	widgets.push_back(tw);
 
 	onSetpatchValue();

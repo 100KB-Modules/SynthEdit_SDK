@@ -9,12 +9,12 @@ public:
 	ImageTinted2Gui();
 
 	void InvalidateTint();
-	virtual void onLoaded();
-	virtual GmpiDrawing_API::IMpBitmap* getDrawBitmap() override
+	void onLoaded() override;
+	GmpiDrawing_API::IMpBitmap* getDrawBitmap() override
 	{
 		return bitmapTinted_.Get();
 	}
-	virtual int32_t MP_STDCALL OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext) override
+	int32_t MP_STDCALL OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext) override
 	{
 		if (tint_color[3] == 0)
 		{

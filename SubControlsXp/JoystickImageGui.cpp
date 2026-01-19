@@ -11,6 +11,7 @@ using namespace GmpiDrawing;
 using namespace GmpiDrawing_API;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, JoystickImageGui, L"ImageJoystick");
+SE_DECLARE_INIT_STATIC_FILE(ImageJoystick);
 
 JoystickImageGui::JoystickImageGui()
 {
@@ -44,10 +45,10 @@ void JoystickImageGui::onLoaded()
 
 int32_t JoystickImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 {
-	GmpiDrawing::Graphics dc2(drawingContext);
-	auto dc = dc2.Get();
-
+	GmpiDrawing::Graphics g(drawingContext);
 	GmpiDrawing::Rect r = getRect();
+
+	ClipDrawingToBounds cd(g, r);
 
 	if (bitmap_.isNull())
 		return gmpi::MP_OK;
@@ -64,7 +65,7 @@ int32_t JoystickImageGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingCon
 
 		GmpiDrawing::Rect knob_rect(0.f, (float)drawAt, (float)bitmapMetadata_->frameSize.width, (float)( drawAt + bitmapMetadata_->frameSize.height));
 		GmpiDrawing::Rect dest_rect(x, y, x + (float)bitmapMetadata_->frameSize.width, y + (float)bitmapMetadata_->frameSize.height);
-		dc->DrawBitmap(bitmap_.Get(), &dest_rect, 1.0f, 1, &knob_rect);
+		g.DrawBitmap(bitmap_, dest_rect, knob_rect);
 	}
 	break;
 	}

@@ -21,6 +21,7 @@ consume memory, same when changing patch (each patch currently treated as new so
 SoundfontOscillator2::SoundfontOscillator2( IMpUnknown* host ) : MpBase( host )
 ,trigger_state( false )
 ,gate_state( false )
+,current_osc_func((SubProcess_ptr)&SoundfontOscillator2::sub_process_silence)
 {
 	// Register pins.
 	initializePin( 0, pinSampleId );
@@ -43,7 +44,7 @@ void SoundfontOscillator2::onGraphStart()
 	pinRight.setStreaming( false );
 }
 
-void SoundfontOscillator2::onSetPins(void)
+void SoundfontOscillator2::onSetPins()
 {
 	if( pinGate.isUpdated() || pinTrigger.isUpdated() )
 	{
@@ -134,6 +135,8 @@ void SoundfontOscillator2::NoteOn( int blockPosistion )
 
 	if( sampleHandle != pinSampleId )
 	{
+		partials.clear();
+
 		SampleManager::Instance()->Release( sampleHandle );
 		sampleHandle = pinSampleId;
 
@@ -171,53 +174,45 @@ void SoundfontOscillator2::NoteOn( int blockPosistion )
 
 		GetZone(chan, (int)NoteNum, NoteVel);
 
-		activePartialListType::iterator it2 = partials.begin();
-		for( activeZoneListType::iterator it = playingZones.begin() ; it != playingZones.end() ; ++it )
+		for( auto& partial : partials )
 		{
-			Jzone &z = *(*it);
-			partial &partial = *(it2++);
+			Jzone &z = *partial.zone;
 
-			if( partial.cur_sample_r->sfSampleType & 0x8000 ) // rom sample?
+			assert(0 == (partial.right.cur_sample->sfSampleType & 0x8000)); // no ROM samples allowed.
+
+/*todo			if( ((SoundfontOscillator2*) CloneOf())->m_status != 0 )
 			{
-//				_RPT0(_CRT_WARN,"Sample Play:ROM SAMPLE!!!!\n");
-	//todo			((SoundfontOscillator2*) CloneOf())->m_status = 1; // ROM Sample
-	//			Refresh_UI();
+				((SoundfontOscillator2*) CloneOf())->m_status = 0; // Good Sample
+				Refresh_UI();
 			}
-			else
-			{
-	/*todo			if( ((SoundfontOscillator2*) CloneOf())->m_status != 0 )
-				{
-					((SoundfontOscillator2*) CloneOf())->m_status = 0; // Good Sample
-					Refresh_UI();
-				}
-	*/
-				sample_playing = true;
+*/
+			sample_playing = true;
 
-				float root_key = partial.cur_sample_r->byOriginalKey;
-				float pitch_correction = partial.cur_sample_r->chCorrection;
+			float root_key = partial.right.cur_sample->byOriginalKey;
+			float pitch_correction = partial.right.cur_sample->chCorrection;
 
-				float overiding_root_key = z.Get(58).shAmount;
-				if( overiding_root_key >= 0.0 )
-					root_key = overiding_root_key;
+			float overiding_root_key = z.Get(58).shAmount;
+			if( overiding_root_key >= 0.0 )
+				root_key = overiding_root_key;
 
-				float course_tune = z.Get(51).shAmount;
-				float fine_tune = z.Get(52).shAmount;
-				partial.scale_tune = z.Get(56).shAmount * 0.1f; // degree to which MIDI key number influences pitch. zero -> no effect on pitch. 100 - normal semitone scale
-				float tune = course_tune + ( fine_tune + pitch_correction ) / 100.f;
-				/*
-					_RPT3(_CRT_WARN, "root_key %f, course_tune %f fine_tune %f\n", root_key, course_tune,fine_tune, );
-					_RPT1(_CRT_WARN, "sample rate %d\n", cur_sample_r->dwSampleRate );
-					_RPT1(_CRT_WARN, "bend %f\n", bend );
-				*/
-				float transposition = ( (float) NoteNum - root_key + tune ) / 120.f ;
+			float course_tune = z.Get(51).shAmount;
+			float fine_tune = z.Get(52).shAmount;
+			partial.scale_tune = z.Get(56).shAmount * 0.1f; // degree to which MIDI key number influences pitch. zero -> no effect on pitch. 100 - normal semitone scale
+			float tune = course_tune + ( fine_tune + pitch_correction ) / 100.f;
+			/*
+				_RPT3(_CRT_WARN, "root_key %f, course_tune %f fine_tune %f\n", root_key, course_tune,fine_tune, );
+				_RPT1(_CRT_WARN, "sample rate %d\n", right.cur_sample->dwSampleRate );
+				_RPT1(_CRT_WARN, "bend %f\n", bend );
+			*/
+			float transposition = ( (float) NoteNum - root_key + tune ) / 120.f ;
 			
-				partial.root_pitch = 0.5f + (NoteNum - MIDDLE_A) / 120.f;
-				partial.root_pitch -= transposition;
+			partial.root_pitch = 0.5f + (NoteNum - MIDDLE_A) / 120.f;
+			partial.root_pitch -= transposition;
 
-				partial.relative_sample_rate = (float) partial.cur_sample_r->dwSampleRate / getSampleRate();
-				partial.CalculateIncrement( p_pitch );
-				partial.s_ptr_fine = -partial.s_increment;
-			}
+			partial.relative_sample_rate = (float) partial.right.cur_sample->dwSampleRate / getSampleRate();
+			partial.CalculateIncrement( p_pitch );
+			partial.left.s_ptr_fine = -partial.left.s_increment;
+			partial.right.s_ptr_fine = -partial.right.s_increment;
 		}
 	}
 
@@ -231,12 +226,6 @@ void SoundfontOscillator2::NoteOn( int blockPosistion )
 		_RPT2(_CRT_WARN,"Sample Play:no suitable sample (Note %d, Vel %d)\n",  NoteNum,  NoteVel);
 	}
 */
-
-	//if( sample_playing )
-	//{
-	//	pinLeft.setStreaming( true, blockPosistion );
-	//	pinRight.setStreaming( true, blockPosistion );
-	//}
 
 	pinLeft.setStreaming( sample_playing, blockPosistion );
 	pinRight.setStreaming( sample_playing, blockPosistion );
@@ -265,8 +254,6 @@ int32_t SoundfontOscillator2::open()
 	interpolation_table2 = GetInterpolationtable();
 	SincInterpolator::interpolation_table2 = GetInterpolationtable();
 
-	sample_playing = false;
-
 	return MpBase::open();
 }
 
@@ -287,7 +274,7 @@ void SoundfontOscillator2::ChooseSubProcess( int blockPosistion )
 				partial &partial = *it;
                 usesPanning = (std::max)( usesPanning, partial.UsesPanning() );
 			}
-			// if( cur_sample_l ) // no mono-optimised loop yet.
+			// if( left.cur_sample ) // no mono-optimised loop yet.
 			{
 				switch( pinQuality )
 				{
@@ -379,7 +366,7 @@ void SoundfontOscillator2::ChooseSubProcess( int blockPosistion )
                 usesPanning = (std::max)( usesPanning, partial.UsesPanning() );
 			}
 
-			// if( cur_sample_l ) // no mono-optimised loop yet.
+			// if( left.cur_sample ) // no mono-optimised loop yet.
 			{
 				int test = pinQuality;
 				switch( pinQuality )
@@ -461,7 +448,7 @@ void SoundfontOscillator2::ChooseSubProcess( int blockPosistion )
 	}
 }
 
-void SoundfontOscillator2::ResetWave(void)
+void SoundfontOscillator2::ResetWave()
 {
 	if( sample_playing )
 	{
@@ -470,12 +457,12 @@ void SoundfontOscillator2::ResetWave(void)
 	}
 }
 
-inline bool is_denormal( float f )
-{
-	uint32_t l = *((uint32_t*)&f);
-
-	return( f != 0.f && (l & 0x7FF00000) == 0 && (l & 0x000FFFFF) != 0 ); // anything less than approx 1E-38 excluding +ve and -ve zero (two distinct values)
-}
+//inline bool is_denormal( float f )
+//{
+//	uint32_t l = *((uint32_t*)&f);
+//
+//	return( f != 0.f && (l & 0x7FF00000) == 0 && (l & 0x000FFFFF) != 0 ); // anything less than approx 1E-38 excluding +ve and -ve zero (two distinct values)
+//}
 
 // *** shared Interpolation filter setup ***
 float* SoundfontOscillator2::GetInterpolationtable()
@@ -559,7 +546,7 @@ float* SoundfontOscillator2::GetInterpolationtable()
 			for( int table_entry = 0 ; table_entry < INTERPOLATION_POINTS ; table_entry++ )
 			{
 				float adjusted = interpolation_table2[table_index+table_entry] / (float)fir_sum;
-				if( is_denormal(adjusted))
+				if (fpclassify(adjusted) == FP_SUBNORMAL)
 					adjusted = 0.f;
 				assert( (table_index+table_entry) >= 0 && (table_index+table_entry) < tableSize_ );
 				interpolation_table2[table_index+table_entry] = adjusted;

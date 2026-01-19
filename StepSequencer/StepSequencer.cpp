@@ -1,11 +1,9 @@
 #include "./StepSequencer.h"
-//#include "./StepSequencer.xml.h"
 #include <algorithm>
 
 using namespace std;
 
 REGISTER_PLUGIN ( StepSequencer, L"SE Step Sequencer" );
-//REGISTER_XML( STEPSEQUENCER_XML );
 
 /* LIMITATION: Only sample-and-holds each input.  If input changes mid-step, it's ignored
 */

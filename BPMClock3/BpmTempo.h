@@ -8,13 +8,15 @@ class BpmTempo : public MpBase
 public:
 	BpmTempo( IMpUnknown* host );
 	void subProcess( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	virtual void onSetPins();
 
 private:
 	FloatInPin pinHostBpm;
 	BoolInPin pinHostTransport;
 	AudioOutPin pinTransport;
 	AudioOutPin pinBpm;
+	IntInPin pinProcessorResumedIn;
+	BoolOutPin pinProcessorResumed;
 };
 
 #endif

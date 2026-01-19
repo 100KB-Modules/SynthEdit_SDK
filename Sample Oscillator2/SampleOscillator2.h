@@ -127,7 +127,7 @@ public:
 	SoundfontOscillator2( IMpUnknown* host );
 	~SoundfontOscillator2();
 	virtual int32_t MP_STDCALL open();
-	virtual void onSetPins(void);
+	void onSetPins() override;
 	virtual void onGraphStart();
 
 	IntInPin pinSampleId;
@@ -142,21 +142,12 @@ public:
 	void ChooseSubProcess( int blockPosistion );
 	void process_with_gate( int bufferOffset, int sampleframes );
 
-
-//	template< class InterpolationPolicy, class PitchModulationPolicy, PanningSupport_t PanningSupport >
-	//void sub_process_template( int bufferOffset, int sampleframes )
-	//{
-	//	CodeGenerator< InterpolationPolicy, PitchModulationPolicy, PanningSupport >::sub_process( *this, bufferOffset, sampleframes );
-	//};
-
 	template< class InterpolationPolicy, class PitchModulationPolicy = PitchFixed, PanningSupport_t PanningSupport = noPanning >
-//	class CodeGenerator : public InterpolationPolicy, private PitchModulationPolicy
 	void sub_process_template(int bufferOffset, int sampleframes)
 	{
-//		static void sub_process(class SoundfontOscillator2& oscillator, int bufferOffset, int sampleframes) //const
 		bool addToOutput = false;
 
-		for (activePartialListType::iterator it = partials.begin(); it != partials.end(); )
+		for (auto it = partials.begin(); it != partials.end(); )
 		{
 			partial &partial = *it;
 
@@ -168,28 +159,29 @@ public:
 			{
 				PitchModulationPolicy::CalculateIncrement(partial, pitch);
 
-				partial.IncrementPointer(gate_state);
+				auto sR = partial.right.IncrementPointer(gate_state);
 
 				float left, right;
 
 				if (partial.IsStereo())
 				{
-					assert(partial.s_ptr_l == partial.s_ptr_r + partial.s_ptr_l_offset);
+					auto sL = partial.left.IncrementPointer(gate_state);
+					//					assert(partial.s_ptr_l == sR + partial.s_ptr_l_offset);
 
-					right = InterpolationPolicy::Interpolate(partial.s_ptr_r, partial.s_ptr_fine);
-					left = InterpolationPolicy::Interpolate(partial.s_ptr_l, partial.s_ptr_fine);
+					right = InterpolationPolicy::Interpolate(sR, partial.right.s_ptr_fine);
+					left  = InterpolationPolicy::Interpolate(sL, partial.left.s_ptr_fine);
 				}
 				else
 				{
 					if (PanningSupport == Panning)
 					{
-						float output = InterpolationPolicy::Interpolate(partial.s_ptr_r, partial.s_ptr_fine);
+						float output = InterpolationPolicy::Interpolate(sR, partial.right.s_ptr_fine);
 						left = output * partial.pan_left_level;
 						right = output * partial.pan_right_level;
 					}
 					else
 					{
-						left = right = InterpolationPolicy::Interpolate(partial.s_ptr_r, partial.s_ptr_fine);
+						left = right = InterpolationPolicy::Interpolate(sR, partial.right.s_ptr_fine);
 					}
 				}
 
@@ -230,20 +222,16 @@ public:
 	void sub_process_silence(int bufferOffset, int sampleframes);
 	void NoteDone( int blockPosistion );
 	void NoteOn( int blockPosistion );
-	void NoteOff( int blockPosistion );
-
-	bool gate_state;
+	void ResetWave(void);
 
 private:
 	float* GetInterpolationtable();
 	bool trigger_state;
+	bool gate_state;
 
 	std::wstring FileName;
 
 	SubProcess_ptr current_osc_func;
-	bool sample_playing;
-
-public:
-	void ResetWave(void);
+	bool sample_playing = false;
 };
 

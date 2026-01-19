@@ -10,7 +10,7 @@
 #include "ConnectorView.h"
 #include "SubViewPanel.h"
 #include "tinyxml/tinyxml.h"
-#include "../SE_DSP_CORE/IGuiHost2.h"
+#include "IGuiHost2.h"
 
 using namespace std;
 using namespace gmpi;
@@ -59,9 +59,12 @@ namespace SynthEdit2
 
 		// Clear out previous view.
 		assert(!isIteratingChildren);
-		children.clear();
+
+		mouseOverObject = nullptr;
 		elementBeingDragged = nullptr;
 		patchAutomatorWrapper_ = nullptr;
+
+		children.clear();
 
 		if (mouseCaptureObject)
 		{

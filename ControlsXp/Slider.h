@@ -8,13 +8,13 @@ class Slider : public MpBase2
 {
 public:
 	Slider();
-	virtual int32_t MP_STDCALL open()
+	int32_t MP_STDCALL open()
 	{
 		pinValueOut.setCurveType(SmartAudioPin::LinearAdaptive); // Automatic.
 		return MpBase2::open();
 	}
 	void subProcess(int sampleFrames);
-	virtual void onSetPins(void);
+	void onSetPins() override;
 
 private:
 	FloatInPin pinValueIn;

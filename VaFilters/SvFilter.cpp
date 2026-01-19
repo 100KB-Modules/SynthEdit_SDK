@@ -1,9 +1,12 @@
 #include <float.h>
 #include <climits>
+#include <mutex>
 #include "./SvFilter.h"
 
 REGISTER_PLUGIN2(StateVariableFilter3, L"SE SV Filter4");
 REGISTER_PLUGIN2(StateVariableFilter3B, L"SE SV Filter4B");
+SE_DECLARE_INIT_STATIC_FILE(SVFilter4);
+SE_DECLARE_INIT_STATIC_FILE(SVFilter4B);
 
 StateVariableFilter3B::StateVariableFilter3B()
 {
@@ -122,6 +125,10 @@ void StateVariableFilter3::OnFilterSettled()
 
 int32_t StateVariableFilterBase::open()
 {
+	// fix for race conditions.
+	static std::mutex safeInit;
+	std::lock_guard<std::mutex> lock(safeInit);
+
 	// 20kHz is about 10.5 Volts. 1Hz is about -3.7 volts. 0.01Hz = -10V
 	// -4 -> 11 Volts should cover most posibilities. 15V Range. 12 entries per volt = 180 entries.
 	const int entriesPerOctave = 12;
@@ -157,7 +164,7 @@ int32_t StateVariableFilterBase::open()
 	return FilterBase::open();
 }
 
-void StateVariableFilterBase::onSetPins(void)
+void StateVariableFilterBase::onSetPins()
 {
 	// Check which pins are updated.
 	if( pinPitch.isUpdated() && !pinPitch.isStreaming() )
@@ -182,6 +189,6 @@ void StateVariableFilterBase::StabilityCheck()
 	// periodic check/correct for numeric overflow.
 	if (!isfinite(m_fZA1) || !isfinite(m_fZB1) || !isfinite(m_fZA2) || !isfinite(m_fZB2))
 	{
-		m_fZA1 = m_fZB1 = m_fZA2 = m_fZB2 = 0.0f;
+		m_fZA1 = m_fZB1 = m_fZA2 = m_fZB2 = 0.0f; // reset filter be zeroing it's state.
 	}
 }

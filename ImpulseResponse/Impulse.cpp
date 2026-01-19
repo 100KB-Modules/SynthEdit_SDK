@@ -1,6 +1,7 @@
-#include ".\Impulse.h"
+#include "./Impulse.h"
 
 REGISTER_PLUGIN ( Impulse, L"SE Impulse" );
+SE_DECLARE_INIT_STATIC_FILE(Impulse);
 
 Impulse::Impulse( IMpUnknown* host ) : MpBase( host )
 	,Triggerstate_(false)
@@ -34,7 +35,7 @@ void Impulse::subProcess( int bufferOffset, int sampleFrames )
 	}
 }
 
-void Impulse::onSetPins(void)
+void Impulse::onSetPins()
 {
 	// Set state of output audio pins.
 	pinAudioOut.setStreaming(true);

@@ -1,7 +1,7 @@
 #include "../se_sdk3/mp_sdk_audio.h"
 extern "C"
 {
-	#include "soundpipe.h"
+	#include "./h/soundpipe.h"
 }
 
 using namespace gmpi;
@@ -37,7 +37,7 @@ public:
 			sp_zitarev_destroy(&reverbInfo);
 	}
 
-	int32_t MP_STDCALL open()
+	int32_t MP_STDCALL open() override
 	{
 		sp_zitarev_create(&reverbInfo);
 		sp_zitarev_init(&soundPipeData, reverbInfo);
@@ -67,7 +67,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override
+	void onSetPins() override
 	{
 		bool updateArgs = false;
 

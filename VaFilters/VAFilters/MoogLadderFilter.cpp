@@ -1,11 +1,11 @@
 #include "MoogLadderFilter.h"
 
-CMoogLadderFilter::CMoogLadderFilter(void)
+CMoogLadderFilter::CMoogLadderFilter()
 {
 	zMinusOneRegister = 0.0;
 }
 
-CMoogLadderFilter::~CMoogLadderFilter(void)
+CMoogLadderFilter::~CMoogLadderFilter()
 {
 }
 

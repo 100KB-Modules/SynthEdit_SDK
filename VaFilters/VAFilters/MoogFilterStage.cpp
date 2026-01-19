@@ -1,12 +1,12 @@
 #include "MoogFilterStage.h"
 
-CMoogFilterStage::CMoogFilterStage(void)
+CMoogFilterStage::CMoogFilterStage()
 {
 	rho = 0;
 	sampleRate = 44100;
 }
 
-CMoogFilterStage::~CMoogFilterStage(void)
+CMoogFilterStage::~CMoogFilterStage()
 {
 }
 

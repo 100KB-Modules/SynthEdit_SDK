@@ -11,18 +11,24 @@ class TextEntry4Gui : public TextSubcontrol
 public:
 	TextEntry4Gui();
 
-	// overrides.
-	virtual int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point);
-	virtual int32_t MP_STDCALL onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point);
+	void onSetStyle();
 
-	virtual std::string getDisplayText() override;
+	int32_t MP_STDCALL OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext) override;
+	int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+	int32_t MP_STDCALL onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+
+	std::string getDisplayText() override;
 
 private:
 	void OnTextEnteredComplete(int32_t result);
 
 	StringGuiPin pinText;
  	BoolGuiPin pinMultiline;
+ 	BoolGuiPin pinMouseDown_LEGACY;
  	BoolGuiPin pinMouseDown;
+
+	GmpiDrawing::TextFormat_readonly textFormat;
+	FontMetadata* fontmetadata = nullptr;
 };
 
 #endif

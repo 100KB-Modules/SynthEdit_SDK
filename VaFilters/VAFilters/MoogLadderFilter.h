@@ -4,8 +4,8 @@
 class CMoogLadderFilter
 {
 public:
-	CMoogLadderFilter(void);
-	~CMoogLadderFilter(void);
+	CMoogLadderFilter();
+	~CMoogLadderFilter();
 
 protected:
 	CMoogFilterStage filter1;

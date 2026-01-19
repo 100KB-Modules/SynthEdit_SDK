@@ -1,12 +1,12 @@
 #ifndef LADDERFILTER_H_INCLUDED
 #define LADDERFILTER_H_INCLUDED
 
-#include "../se_sdk3/mp_sdk_audio.h"
+#include "../shared/FilterBase.h"
 #include "VAFilters/MoogLadderFilter.h"
 #include "VAFilters/TPTMoogLadderFilter.h"
 
 // optimised version.
-class LadderFilter : public MpBase2
+class LadderFilter : public FilterBase
 {
 //	CMoogLadderFilter filter;
 	CTPTMoogLadderFilter filter;
@@ -14,9 +14,23 @@ class LadderFilter : public MpBase2
 public:
 	LadderFilter( );
 
+	// FilterBase support
+	void StabilityCheck() override;
+	bool isFilterSettling() override
+	{
+		return !pinSignal.isStreaming();
+	}
+
+	AudioOutPin& getOutputPin() override
+	{
+		return pinOutput;
+	}
+
 //	template< class PitchModulationPolicy, class ResonanceModulationPolicy, class FilterModePolicy >
 	void subProcess(int sampleFrames)
 	{
+		doStabilityCheck(); // must be first
+
 		// get pointers to in/output buffers.
 		float* signal = getBuffer(pinSignal);
 		float* pitch = getBuffer(pinPitch);
@@ -24,6 +38,8 @@ public:
 		float* output = getBuffer(pinOutput);
 
 		float hz = 440.f * powf(2.f, ( 10.0f * *pitch ) - 5.f);
+		hz = (std::min)(hz, 21000.f);
+
 		filter.calculateTPTCoeffs(hz, *resonance * 25);
 
 		for( int s = sampleFrames; s > 0; --s )
@@ -38,7 +54,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 	virtual int32_t MP_STDCALL open() override;
 
 private:
@@ -59,7 +75,7 @@ class LadderFilter_test : public MpBase2
 public:
 	LadderFilter_test();
 	void subProcess(int sampleFrames);
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 	virtual int32_t MP_STDCALL open() override;
 
 private:

@@ -1,7 +1,7 @@
 #ifndef JOYSTICKIMAGEGUI_H_INCLUDED
 #define JOYSTICKIMAGEGUI_H_INCLUDED
 
-#include "../SharedLegacyWidgets/ImageBase.h"
+#include "../sharedLegacyWidgets/ImageBase.h"
 
 class JoystickImageGui : public ImageBase
 {

@@ -4,7 +4,7 @@
 #include "modules/se_sdk3/mp_api.h"
 #include "modules/shared/RawView.h"
 
-namespace SE2
+namespace SynthEdit2
 {
 	class IPresenter;
 }
@@ -24,5 +24,7 @@ public:
 	virtual int32_t getController(int32_t handle, gmpi::IMpController** returnController) = 0;
 	virtual void serviceGuiQueue() = 0;
 	virtual void LoadNativePresetFile(std::string /*presetName*/) {}
-	virtual void setMainPresenter(SE2::IPresenter* presenter) = 0;
+	virtual void setMainPresenter(SynthEdit2::IPresenter* presenter) = 0;
+	virtual void undoTransanctionStart() = 0;
+	virtual void undoTransanctionEnd() = 0;
 };

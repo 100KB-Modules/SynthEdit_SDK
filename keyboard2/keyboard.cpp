@@ -62,7 +62,7 @@ int32_t Keyboard::open()
 	return gmpi::MP_OK;
 }
 
-void Keyboard::onSetPins(void)  // one or more pins_ updated.  Check pin update flags to determin which ones.
+void Keyboard::onSetPins()  // one or more pins_ updated.  Check pin update flags to determin which ones.
 {
 //	_RPT1(_CRT_WARN, "Keyboard::onSetPins pinGate=%f\n", (double) pinGate );
 

@@ -2,17 +2,18 @@
 #define STREAMINGSTATE_H_INCLUDED
 
 #include "mp_sdk_audio.h"
+#include "../se_sdk3/smart_audio_pin.h" 
 
 class StreamingState : public MpBase
 {
 public:
 	StreamingState( IMpUnknown* host );
 	void subProcess( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	void onSetPins() override;
 
 private:
 	AudioInPin pinSignalIn;
-	AudioOutPin pinSignalOut;
+	SmartAudioPin pinSignalOut;
 	float output_;
 };
 

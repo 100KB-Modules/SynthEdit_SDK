@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <PluginList>
-  <Plugin id="SE Oversampling Control" name="Oversampling Control" category="Special" helpUrl="SE Oversampling Control.html">
+  <Plugin id="SE Oversampling Control" name="Oversampling Control" category="Special" helpUrl="http://synthedit.com/help/oversampling-control">
     <GUI>
       <Pin name="Oversampling" datatype="int" private="true" hostConnect="Oversampling/Rate" />
       <Pin name="list items" datatype="string" private="true" hostConnect="Oversampling/Rate" parameterField="EnumList" />
@@ -13,7 +13,7 @@
     </GUI>
   </Plugin>
 <!--
-  <Plugin id="SE Latency Compensation" name="Latency Compensation" category="Experimental" >
+  <Plugin id="SE Latency Compensation" name="Latency Compensation" category="Experi mental" >
     <GUI>
       <Pin datatype="int" private="true" hostConnect="Processor/MaxLatencyCompensation" />
       <Pin name="Constrain latency (ms)" datatype="int" direction="out" />

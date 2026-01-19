@@ -26,10 +26,9 @@ public:
 	void onVoicesActiveChanged( int voiceId );
 	void onPolyModeChanged();
 	void DrawTrace(GmpiDrawing::Factory& factory, GmpiDrawing::Graphics& g, float* capturedata, GmpiDrawing::Brush& pen, float mid_y, float scale, int width);
-//	void DrawTrace2(int32_t* image, int width, int32_t color, float* capturedata, float mid_y, float scale);
 
 	// TimerClient overide.
-	virtual bool OnTimer() override;
+	bool OnTimer() override;
 
 	BlobArrayGuiPin pinSamplesA;
 	BlobArrayGuiPin pinSamplesB;
@@ -37,8 +36,8 @@ public:
 	BoolGuiPin pinPolyMode;
 
 private:
-	GmpiDrawing::TextFormat dtextFormat;
-	FontMetadata* typeface_;
+	GmpiDrawing::TextFormat_readonly dtextFormat;
+	FontMetadata* typeface_ = {};
 	int newestVoice_;
 	std::chrono::steady_clock::time_point VoiceLastUpdated[MP_VOICE_COUNT];
 };

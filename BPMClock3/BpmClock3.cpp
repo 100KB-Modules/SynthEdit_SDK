@@ -2,6 +2,7 @@
 #include "math.h"
 #include "./BpmClock3.h"
 #include "../shared/xp_simd.h"
+SE_DECLARE_INIT_STATIC_FILE(BpmClock3)
 
 REGISTER_PLUGIN( BpmClock3, L"SE BPM Clock3" );
 
@@ -184,7 +185,7 @@ double BpmClock3::CalcAccumulatorError(float HostSongPosition, double accumulato
 	return accumulatorError;
 }
 
-void BpmClock3::onSetPins(void)
+void BpmClock3::onSetPins()
 {
 	if (pinPulseDivide.isUpdated())
 	{

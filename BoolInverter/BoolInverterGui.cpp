@@ -1,6 +1,7 @@
 #include "./BoolInverterGui.h"
 
 REGISTER_GUI_PLUGIN( BoolInverterGui, L"SE GUI Bool Inverter" );
+SE_DECLARE_INIT_STATIC_FILE(GUIBoolInverter_Gui);
 
 BoolInverterGui::BoolInverterGui( IMpUnknown* host ) : MpGuiBase(host)
 {

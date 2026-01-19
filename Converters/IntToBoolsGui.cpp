@@ -80,14 +80,12 @@ int32_t IntToBoolsGui::setPin( int32_t pinId, int32_t voice, int32_t size, void*
 BoolsToIntGui::BoolsToIntGui() :
 numInputPins(0)
 {
-	// initialise pins.
-//	initializePin(pinBoolVal, static_cast<MpGuiBaseMemberPtr2>( &BoolsToIntGui::onSetBoolVal ));
 	initializePin(pinIntVal, static_cast<MpGuiBaseMemberPtr2>( &BoolsToIntGui::onSetIntVal ));
 }
 
 int32_t BoolsToIntGui::setPin(int32_t pinId, int32_t voice, int32_t size, const void* data)
 {
-	numInputPins = ( std::max )( numInputPins, pinId - firstInputIdx );
+	numInputPins = (std::max)( numInputPins, pinId );
 
 	auto inPinIdx = pinId - firstInputIdx;
 	if( inPinIdx >= 0 )

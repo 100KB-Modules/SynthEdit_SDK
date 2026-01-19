@@ -4,8 +4,8 @@
 class CTPTMoogFilterStage
 {
 public:
-	CTPTMoogFilterStage(void);
-	~CTPTMoogFilterStage(void);
+	CTPTMoogFilterStage();
+	~CTPTMoogFilterStage();
 
 protected:
 	// controls

@@ -16,7 +16,11 @@ void ListToTextGui::onListChanged()
 	it_enum_list it( itemList.getValue() );
 	it.FindValue( choice );
 
-	if( !it.IsDone() )
+	if(it.IsDone())
+	{
+		itemText = std::string();
+	}
+	else
 	{
 		itemText = it.CurrentItem()->text;
 	}

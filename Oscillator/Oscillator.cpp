@@ -213,7 +213,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
 		// Check which pins are updated.
 		if( pinPulseWidth.isStreaming() )
@@ -611,5 +611,5 @@ public:
 
 namespace
 {
-	auto r = Register<Oscillator>::withId(L"My Oscillator");
+	auto r = Register<Oscillator>::withId(L"SE Oscillator");
 }

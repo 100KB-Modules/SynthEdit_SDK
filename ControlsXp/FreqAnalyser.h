@@ -12,12 +12,12 @@ public:
 	FreqAnalyser();
 
 	// overrides
-	virtual int32_t MP_STDCALL open();
+	int32_t MP_STDCALL open() override;
 
 	// methods
 	void subProcess(int sampleFrames);
 	void waitAwhile(int sampleFrames);
-	void onSetPins(void);
+	void onSetPins() override;
 
 	virtual int getTimeOut()
 	{
@@ -31,7 +31,8 @@ protected:
 	BlobOutPin pinSamplesA;
 	AudioInPin pinSignalA;
 	IntInPin pinCaptureSize;
-
+	IntInPin pinUpdateRate;
+	
 	int index_;
 	int timeoutCount_;
 	int sleepCount;

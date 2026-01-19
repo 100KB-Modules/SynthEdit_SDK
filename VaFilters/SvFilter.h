@@ -7,182 +7,174 @@
 #include <math.h>
 #include <algorithm>
 
-class FilterPitchChanging
-{
-public:
-    const static int pitchTableLowVolts = -4; // ~ 1Hz
-    const static int pitchTableHiVolts = 11;  // ~ 20kHz.
-
-    // Fast version using table.
-    inline static float ComputeIncrement2( const float* pitchTable, float pitch )
-    {
-		// TODO: see OscillatorNaive.h for faster method.
-	    const float maxPitchValue = pitchTableHiVolts * 0.1f;
-	    const float minPitchValue = pitchTableLowVolts * 0.1f;
-		if (pitch > maxPitchValue)
-		{
-		    pitch = maxPitchValue;
-		}
-		else
-		{
-			if( pitch < minPitchValue )
-				pitch = minPitchValue;
-		}
-
-	    pitch *= 120.0f;
-
-	    int table_floor = FastRealToIntTruncateTowardZero(pitch); // fast float-to-int using SSE. truncation toward zero.
-	    float fraction = pitch - (float) table_floor;
-
-	    // Linear interpolator.
-	    const float* p = pitchTable + table_floor;
-	    return p[0] + fraction * (p[1] - p[0]);
-
-	    /*
-	    // Cubic interpolator. Too slow. Can't hear such precision in a filter anyhow.
-	    float y0 = pitchTable[table_floor-1];
-	    float y1 = pitchTable[table_floor+0];
-	    float y2 = pitchTable[table_floor+1];
-	    float y3 = pitchTable[table_floor+2];
-
-	    return y1 + 0.5f * fraction*(y2 - y0 + fraction * (2.0f*y0 - 5.0f*y1 + 4.0f*y2 - y3 + fraction*(3.0f*(y1 - y2) + y3 - y0)));
-	    */
-    }
-    
-    inline static void CalcInitial(const float* pitchTable, float pitch, float returnIncrement)
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	inline static void Calculate(const float* pitchTable, float pitch, float& returnIncrement)
-	{
-		returnIncrement = ComputeIncrement2(pitchTable, pitch);
-	}
-	inline static void IncrementPointer(float*& pitch)
-	{
-		++pitch;
-	}
-	enum { Active = true };
-};
-
-class FilterPitchFixed
-{
-public:
-	inline static void CalcInitial( const float* pitchTable, float pitch, float& returnIncrement )
-	{
-		return FilterPitchChanging::Calculate(pitchTable, pitch, returnIncrement );
-	}
-	inline static void Calculate( const float* pitchTable, float pitch, float returnIncrement )
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	inline static void IncrementPointer( const float* pitch )
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	enum { Active = false };
-};
-
-
-class ResonanceChanging
-{
-public:
-	inline static void CalcInitial(float resonance, float pitch, float returnQuality)
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	inline static void Calculate(float resonance, float pitch, float& returnQuality)
-	{
-		// Roughly match old SVF Resonance range.
-		float res = (std::min)(resonance, pitch + 0.2f); // Restrict max resonance at lower pitch.
-// testin notch		res = (std::max)(res, -1.0f);
-		returnQuality = 0.4f - 0.7f * res; // nice scale.
-
-//		returnQuality = (std::max)(0.005f, 1.0f - resonance);
-		returnQuality = (std::max)(0.001f, 1.0f - resonance);
-	}
-	inline static void IncrementPointer(float*& pointer)
-	{
-		++pointer;
-	}
-	enum { Active = true };
-}; 
-
-class ResonanceFixed
-{
-public:
-	inline static void CalcInitial( float resonance, float pitch, float& returnQuality )
-	{
-		return ResonanceChanging::Calculate( resonance, pitch, returnQuality );
-	}
-	inline static void Calculate(float resonance, float pitch, float returnQuality)
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	inline static void IncrementPointer( const float* pitch )
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	enum { Active = false };
-};
-
-
-
-class FilterModeLowPass
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return lowPass;
-	}
-};
-
-class FilterModeHighPass
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return highPass;
-	}
-};
-
-class FilterModeBandPass
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return bandPass;
-	}
-};
-
-class FilterModeBandReject // Notch.
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return input - 2.0f * R * bandPass;
-	}
-};
-
-class FilterModeBandShelving
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return 0.0f; // this (don't know what m_fK is sposed to be) input + 2.0f *R * m_fK * bandPass;
-	}
-};
-
-class FilterModePeaking
-{
-public:
-	inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
-	{
-		return input - 4.0f * R * bandPass;
-	}
-};
-
 class StateVariableFilterBase : public FilterBase
 {
+protected:
+	class FilterPitchChanging
+	{
+	public:
+		const static int pitchTableLowVolts = -4; // ~ 1Hz
+		const static int pitchTableHiVolts = 11;  // ~ 20kHz.
+
+		// Fast version using table.
+		inline static float ComputeIncrement2(const float* pitchTable, float pitch)
+		{
+			// TODO: see OscillatorNaive.h for faster method.
+			const float maxPitchValue = pitchTableHiVolts * 0.1f;
+			const float minPitchValue = pitchTableLowVolts * 0.1f;
+			if(!(pitch < maxPitchValue)) // reverse test to catch also Nans.
+			{
+				pitch = maxPitchValue;
+			}
+			else
+			{
+				if(pitch < minPitchValue)
+					pitch = minPitchValue;
+			}
+
+			pitch *= 120.0f;
+
+			int table_floor = FastRealToIntTruncateTowardZero(pitch); // fast float-to-int using SSE. truncation toward zero.
+			float fraction = pitch - (float)table_floor;
+
+			// Linear interpolator.
+			const float* p = pitchTable + table_floor;
+			return p[0] + fraction * (p[1] - p[0]);
+
+			/*
+			// Cubic interpolator. Too slow. Can't hear such precision in a filter anyhow.
+			float y0 = pitchTable[table_floor-1];
+			float y1 = pitchTable[table_floor+0];
+			float y2 = pitchTable[table_floor+1];
+			float y3 = pitchTable[table_floor+2];
+
+			return y1 + 0.5f * fraction*(y2 - y0 + fraction * (2.0f*y0 - 5.0f*y1 + 4.0f*y2 - y3 + fraction*(3.0f*(y1 - y2) + y3 - y0)));
+			*/
+		}
+
+		inline static void CalcInitial(const float* pitchTable, float pitch, float returnIncrement)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		inline static void Calculate(const float* pitchTable, float pitch, float& returnIncrement)
+		{
+			returnIncrement = ComputeIncrement2(pitchTable, pitch);
+		}
+		inline static void IncrementPointer(float*& pitch)
+		{
+			++pitch;
+		}
+		enum { Active = true };
+	};
+
+	class FilterPitchFixed
+	{
+	public:
+		inline static void CalcInitial(const float* pitchTable, float pitch, float& returnIncrement)
+		{
+			return FilterPitchChanging::Calculate(pitchTable, pitch, returnIncrement);
+		}
+		inline static void Calculate(const float* pitchTable, float pitch, float returnIncrement)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		inline static void IncrementPointer(const float* pitch)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		enum { Active = false };
+	};
+
+	class ResonanceChanging
+	{
+	public:
+		inline static void CalcInitial(float resonance, float pitch, float returnQuality)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		inline static void Calculate(float resonance, float pitch, float& returnQuality)
+		{
+			returnQuality = (std::max)(1.0f - resonance, 0.001f);
+		}
+		inline static void IncrementPointer(float*& pointer)
+		{
+			++pointer;
+		}
+		enum { Active = true };
+	};
+
+	class ResonanceFixed
+	{
+	public:
+		inline static void CalcInitial(float resonance, float pitch, float& returnQuality)
+		{
+			return ResonanceChanging::Calculate(resonance, pitch, returnQuality);
+		}
+		inline static void Calculate(float resonance, float pitch, float returnQuality)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		inline static void IncrementPointer(const float* pitch)
+		{
+			// do nothing. Hopefully optimizes away to nothing.
+		}
+		enum { Active = false };
+	};
+
+	class FilterModeLowPass
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return lowPass;
+		}
+	};
+
+	class FilterModeHighPass
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return highPass;
+		}
+	};
+
+	class FilterModeBandPass
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return bandPass;
+		}
+	};
+
+	class FilterModeBandReject // Notch.
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return input - 2.0f * R * bandPass;
+		}
+	};
+
+	class FilterModeBandShelving
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return 0.0f; // this (don't know what m_fK is sposed to be) input + 2.0f *R * m_fK * bandPass;
+		}
+	};
+
+	class FilterModePeaking
+	{
+	public:
+		inline static float SelectOutput(float input, float R, float& lowPass, float& highPass, float& bandPass)
+		{
+			return input - 4.0f * R * bandPass;
+		}
+	};
+
 protected:
 	AudioInPin pinSignal;
 	AudioInPin pinPitch;
@@ -210,8 +202,8 @@ public:
 		, m_fZB2(0.0f)
 	{}
 
-	virtual int32_t MP_STDCALL open() override;
-	virtual void onSetPins(void) override;
+	int32_t MP_STDCALL open() override;
+	virtual void onSetPins() override;
 	virtual bool isFilterSettling() override
 	{
 		return !pinSignal.isStreaming() && !pinPitch.isStreaming() && !pinResonance.isStreaming();
@@ -287,7 +279,7 @@ public:
 	}
 
 	virtual void ChoseProcessMethod() override;
-	virtual void OnFilterSettled() override;
+	void OnFilterSettled() override;
 
 protected:
 	IntInPin pinMode;

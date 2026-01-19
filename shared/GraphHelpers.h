@@ -30,12 +30,10 @@
 #include "../shared/GraphHelpers.h"
 */
 
-#include "Drawing.h"
 #include <vector>
+#include "Drawing.h"
 
-using namespace GmpiDrawing;
-
-inline void SimplifyGraph(const std::vector<Point>& in, std::vector<Point>& out)
+inline void SimplifyGraph(const std::vector<GmpiDrawing::Point>& in, std::vector<GmpiDrawing::Point>& out)
 {
 	if (in.size() < 2)
 	{
@@ -45,17 +43,16 @@ inline void SimplifyGraph(const std::vector<Point>& in, std::vector<Point>& out)
 
 	out.clear();
 
-    constexpr float tollerance{ 0.3f }; // points this close in pixels to the projected line are skipped.
-    constexpr float tolleranceX{ 0.00001f }; // points this close horizontally are skipped.
+	constexpr float tollerance = 0.3f;
 
 	auto prev = in[0];
     auto lastOut = prev;
     lastOut.y -= 1000.0f; // force prediction failure on first point.
-    float slope{ 0.0f };
-
+	float slope = 0.0f;
+                
     for(auto& p : in)
     {
-        if (fabsf(p.x - lastOut.x) < tolleranceX) // skip points with same x value (infinite slope)
+        if(p.x < lastOut.x + 0.00001f) // skip points with same x value (infinite slope)
             continue;
 
         const float predictedY = lastOut.y + slope * (p.x - lastOut.x);
@@ -71,33 +68,14 @@ inline void SimplifyGraph(const std::vector<Point>& in, std::vector<Point>& out)
         prev = p;
     }
 
-    assert(!out.empty()); // should always contain at least the start point.
+	if (out.empty()) // perfect flat line
+	{
+		out.push_back(lastOut);
+	}
+    
     assert(out.back() != in.back());
     
-    if (fabsf(in.back().x - out.back().x) > tolleranceX) // avoid points with same x value (infinite slope))
+    if(out.back().x < in.back().x - 0.00001f) // skip points with same x value (infinite slope)
         out.push_back(in.back());
 }
 
-inline PathGeometry DataToGraph(Graphics& g, const std::vector<Point>& inData)
-{
-	auto geometry = g.GetFactory().CreatePathGeometry();
-	auto sink = geometry.Open();
-	bool first = true;
-	for (const auto& p : inData)
-	{
-		if (first)
-		{
-			sink.BeginFigure(p);
-			first = false;
-		}
-		else
-		{
-			sink.AddLine(p);
-		}
-	}
-
-	sink.EndFigure(FigureEnd::Open);
-	sink.Close();
-
-	return geometry;
-}

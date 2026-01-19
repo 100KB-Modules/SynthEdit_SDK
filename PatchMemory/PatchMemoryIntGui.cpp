@@ -33,12 +33,17 @@ void PatchMemoryIntGui::onValueChanged()
 
 void PatchMemoryIntGui::onAnimationInChanged()
 {
-	pinAnimationPosition = pinAnimationIn;
+	if(!inhibitFeedback) // prevent jitter
+	{
+		pinAnimationPosition = pinAnimationIn;
+	}
 }
 
 void PatchMemoryIntGui::onAnimationPositionChanged()
 {
+	inhibitFeedback = true;
 	pinAnimationIn = pinAnimationPosition;
+	inhibitFeedback = false;
 }
 
 void PatchMemoryIntGui::onNameInChanged()

@@ -8,7 +8,7 @@ RiffFile2::RiffFile2() :
 {
 }
 
-bool RiffFile2::Open( gmpi::IProtectedFile* file, uint32_t& riff_type )
+bool RiffFile2::Open( gmpi::IProtectedFile2* file, uint32_t& riff_type )
 {
 	filePos = 0;
 	riff_type = 0;
@@ -73,8 +73,8 @@ bool RiffFile2::ReadFile()
 	int res = 0;
 	MMCKINFO_SE chunk;
 
-	int32_t totalFileSize;
-	fileHandle->getSize(totalFileSize);
+	int64_t totalFileSize;
+	fileHandle->getSize(&totalFileSize);
 
 	// cnk[level] keeps track of depth of current chunk (usually no more than 1)
 	while (filePos < totalFileSize - (sizeof(chunk.ckid) + sizeof(chunk.cksize)))
@@ -124,25 +124,23 @@ bool RiffFile2::ReadFile()
 
 						if (rec_chunks[j].addr)	// caller wants chunk read into memory
 						{
-							assert(*(rec_chunks[j].addr) == 0); // overwriting existing pointer!!
-							*(rec_chunks[j].addr) = new char[chunk.cksize];
+							const int32_t padding = rec_chunks[j].padMemoryAllocationBytes;
+							const int32_t allocationBytes = chunk.cksize + padding * 2;
 
-//								memcpy(*(rec_chunks[j].addr), data.data(), data.size());
-							fileHandle->read(*(rec_chunks[j].addr), chunk.cksize);
+							auto& mem = *(rec_chunks[j].addr);
+
+							assert(mem == nullptr); // overwriting existing pointer!!
+							mem = new char[allocationBytes];
+
+							// zero out padding bytes.
+							for (int i = 0; i < padding; ++i)
+							{
+								mem[i] = 0;
+								mem[i + chunk.cksize + padding] = 0;
+							}
+
+							fileHandle->read(mem + padding, chunk.cksize);
 							filePos += chunk.cksize;
-							//						res = mmioRead(file_handle, (HPSTR) *(rec_chunks[j].addr), chnk.cksize);
-							//						assert(res == chnk.cksize);
-													/*
-													// debug output of result
-													int print_words = chnk.cksize / 4;
-													print_words = min(print_words,20);
-													DWORD *ptr = (DWORD*) *(rec_chunks[j].addr);
-													for(int i = 0 ; i < print_words ; i++ )
-													{
-													_RPT1(_CRT_WARN, "%08x ", *ptr++ );
-													}
-													_RPT0(_CRT_WARN, "\n" );
-													*/
 
 							dataRead = true;
 						}

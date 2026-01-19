@@ -11,8 +11,9 @@ public:
 	ListEntry4Gui();
 
 	// overrides.
-	virtual int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point);
-	virtual std::string getDisplayText() override;
+	int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+	int32_t MP_STDCALL onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+	std::string getDisplayText() override;
 
 private:
 	void OnPopupmenuComplete(int32_t result);

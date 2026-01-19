@@ -15,7 +15,7 @@ public:
 	Scope3(IMpUnknown* host);
 
 	// overrides
-	virtual int32_t MP_STDCALL open();
+	int32_t MP_STDCALL open() override;
 
 	// methods
 	void subProcess(int bufferOffset, int sampleFrames);
@@ -23,7 +23,7 @@ public:
 	void waitForTrigger2(int bufferOffset, int sampleFrames);
 	void subProcessCruise(int bufferOffset, int sampleFrames);
 	void forceTrigger();
-	void onSetPins(void);
+	void onSetPins() override;
 
 
 	virtual AudioInPin* getTriggerPin()
@@ -48,10 +48,11 @@ protected:
 
 	int index_;
 	int timeoutCount_;
-	int sleepCount;
+//	int sleepCount;
 	ScopeResults resultsA_;
 	ScopeResults resultsB_;
-	bool channelActive_[SCOPE_CHANNELS];
+//	bool channelActive_[SCOPE_CHANNELS];
+	int channelsleepCount_[SCOPE_CHANNELS];
 	Scope3** currentVoice_;
 	int captureSamples;
 };

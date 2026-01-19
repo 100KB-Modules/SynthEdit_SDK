@@ -4,10 +4,10 @@
 #include <math.h>
 #include "../se_sdk3/it_enum_list.h"
 #include "../shared/unicode_conversion.h"
-#include "TextWidget.h"
-#include "ListWidget.h"
-#include "BitmapWidget.h"
-#include "RotarySwitchWidget.h"
+#include "../sharedLegacyWidgets/TextWidget.h"
+#include "../sharedLegacyWidgets/ListWidget.h"
+#include "../sharedLegacyWidgets/BitmapWidget.h"
+#include "../sharedLegacyWidgets/RotarySwitchWidget.h"
 
 using namespace gmpi_sdk;
 
@@ -19,6 +19,7 @@ using namespace GmpiDrawing;
 using namespace GmpiDrawing_API;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, ListEntryGui, L"SE List Entry" );
+SE_DECLARE_INIT_STATIC_FILE(ListEntry_Gui);
 
 ListEntryGui::ListEntryGui() :
  isarranged(false)
@@ -32,8 +33,11 @@ ListEntryGui::ListEntryGui() :
 	initializePin( 10, pinValueIn, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetValueIn));
 	initializePin(pinHint, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetValueIn));
 	initializePin(pinItemList, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetItems));
-	initializePin( pinAppearance, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetAppearance));
+	initializePin(pinAppearance, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetAppearance));
 	initializePin(pinTitle, static_cast<MpGuiBaseMemberPtr2>(&ListEntryGui::onSetTitle));
+
+	initializePin(pinMenuItems);
+	initializePin(pinMenuSelection);
 }
 
 void ListEntryGui::OnWidgetUpdate(int32_t newvalue)
@@ -51,7 +55,7 @@ void ListEntryGui::onSetAppearance()
 
 	// Reset defaults.
 	const char* imageFile = nullptr;
-
+	
 	switch (pinAppearance)
 	{
 	case ACM_LED_STACK:	// LED Stack
@@ -158,7 +162,6 @@ void ListEntryGui::onSetAppearance()
 		{
 			auto bm2 = make_shared<BitmapWidget>(getHost(), "button_sm");
 			widgets.push_back(bm2);
-//			bm2->SetToggle(true);
 			bm2->toggleMode2 = skinBitmap::ToggleMode::OnOnly;
 		}
 
@@ -180,8 +183,7 @@ void ListEntryGui::onSetAppearance()
 	}
 
 	auto title = (std::string) pinTitle;
-	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str());
-	tw->setCentered();
+	auto tw = make_shared<TextWidget>(getHost(), "control_label", title.c_str(), !useBackwardCompatibleArrangement());
 	widgets.push_back(tw);
 
 	onSetValueIn();
@@ -418,7 +420,7 @@ int32_t ListEntryGui::measure(GmpiDrawing_API::MP1_SIZE availableSize, GmpiDrawi
 
 			// left-to-right stack.
 			float x = 0;
-			for (int i = 0;  i < 2; ++i)
+			for (int i = 0; i < 2; ++i)
 			{
 				auto s = widgets[i]->getSize();
 				returnDesiredSize->height = (std::max)(returnDesiredSize->height, s.height);
@@ -428,6 +430,7 @@ int32_t ListEntryGui::measure(GmpiDrawing_API::MP1_SIZE availableSize, GmpiDrawi
 			// determine max text width.
 			auto ew = dynamic_cast<TextWidget*>(widgets[2].get());
 			auto temp = ew->GetText();
+			returnDesiredSize->width = x;
 
 			for (itr.First(); !itr.IsDone(); ++itr)
 			{
@@ -478,13 +481,13 @@ int32_t ListEntryGui::measure(GmpiDrawing_API::MP1_SIZE availableSize, GmpiDrawi
 			// LEDs stacked vertical
 			// LED.
 			returnDesiredSize->width += sl.width;
-		returnDesiredSize->height = collumnHeight * listEntryCount + rowSpacing * (ledCount - 1);
+			returnDesiredSize->height = collumnHeight * ledCount + rowSpacing * (ledCount - 1);
 
 			float textx = returnDesiredSize->width;
 			// Text.
-			for (int i = 0; i < listEntryCount; ++i)
+			for (int i = 0; i < ledCount; ++i)
 			{
-				float textWidth = ceil(widgets[1 + i + listEntryCount]->getSize().width);
+				float textWidth = ceil(widgets[1 + i + ledCount]->getSize().width);
 				returnDesiredSize->width = (std::max)(returnDesiredSize->width, textx + textWidth + 2);
 			}
 		}
@@ -492,8 +495,17 @@ int32_t ListEntryGui::measure(GmpiDrawing_API::MP1_SIZE availableSize, GmpiDrawi
 
 		case ACM_BUTTON_STACK:
 		{
-			auto sb = widgets[0]->getSize(); // Button.
-			auto s2 = widgets[1]->getSize(); // Text
+			GmpiDrawing::Size sb, s2;
+			if(listEntryCount == 0) // odd case
+			{
+				// no button.
+				s2 = widgets[0]->getSize(); // Text
+			}
+			else
+			{
+				sb = widgets[0]->getSize(); // Button.
+				s2 = widgets[1]->getSize(); // Text
+			}
 
 			sb.height = ceil(sb.height);
 			s2.height = ceil(s2.height);
@@ -594,16 +606,14 @@ int32_t ListEntryGui::arrange(GmpiDrawing_API::MP1_RECT finalRect_s)
 	{
 		// left-to-right stack.
 		float x = 0;
-		for (auto& w : widgets)
+		for (int i = 0 ; i < 3 ;++i)
 		{
+			auto& w = widgets[i];
 			auto s2 = w->getSize();
 			y = remainingRect.top + (remainingRect.getHeight() - s2.height) / 2;
-
-			if (w != widgets.back()) // ignore header.
-			{
-				w->setPosition(Rect(x, y, x + s2.width, y + s2.height));
-				x += s2.width;
-			}
+			float right = i == 2 ? finalRect.getWidth() : x + s2.width; // last widget stretches to fill.
+			w->setPosition(Rect(x, y, right, y + s2.height));
+			x += s2.width;
 		}
 	}
 	break;
@@ -619,7 +629,7 @@ int32_t ListEntryGui::arrange(GmpiDrawing_API::MP1_RECT finalRect_s)
 		Size st;
 
 		if(ACM_LED_STACK_LABELED == pinAppearance)
-			st = widgets[1 + listEntryCount]->getSize(); // Text
+			st = widgets[1 + ledCount]->getSize(); // Text
 
 		float collumnHeight = (std::max)(sl.height, st.height);
 
@@ -635,10 +645,14 @@ int32_t ListEntryGui::arrange(GmpiDrawing_API::MP1_RECT finalRect_s)
 		{
 			float centeredY = y + (collumnHeight - sl.height) * 0.5f;
 			widgets[1 + i]->setPosition(Rect(xl, centeredY, xl + sl.width, centeredY + sl.height));
-			centeredY = y + (collumnHeight - st.height) * 0.5f - 2.0f; // -2 is hack to raise text a little.
+			centeredY = y + (collumnHeight - st.height) * 0.5f;
+			if(useBackwardCompatibleArrangement())
+			{
+				centeredY -= 2.0f; // -2 is hack to raise text a little.
+			}
 
 			if (ACM_LED_STACK_LABELED == pinAppearance)
-				widgets[1 + i + listEntryCount]->setPosition(Rect(xt, centeredY, finalRect.getWidth(), centeredY + st.height)); // text.
+				widgets[1 + i + ledCount]->setPosition(Rect(xt, centeredY, finalRect.getWidth(), centeredY + st.height)); // text.
 
 			y += collumnHeight + rowSpacing;
 		}
@@ -647,36 +661,49 @@ int32_t ListEntryGui::arrange(GmpiDrawing_API::MP1_RECT finalRect_s)
 
 	case ACM_BUTTON_STACK:
 	{
-		int itemCount = (int) widgets.size() / 2;
-		if (itemCount > 0)
+		int itemCount = listEntryCount;
+		GmpiDrawing::Size s, s2;
+		if(listEntryCount == 0) // odd case
 		{
-			//auto s = widgets.front()->getSize(); // Button.
-			//auto s2 = widgets.back()->getSize(); // Text.
-			auto s = widgets[0]->getSize(); // Button.
-			auto s2 = widgets[1]->getSize(); // Text
+			// no button.
+			s2 = widgets[0]->getSize(); // Text
+			widgets[0]->setPosition(Rect(0, 0, s2.width,s2.height));
+		}
+		else
+		{
+			s = widgets[0]->getSize(); // Button.
+			s2 = widgets[1]->getSize(); // Text
+		}
 
-			s.height = ceil(s.height);
-			s2.height = ceil(s2.height);
-			float x = 0; // finalRect.getWidth() - s2.x;
-			float x2 = s.width;
-			int i = 0;
-			float dy = (std::max)(ceil(s.height), ceil(s2.height)) + rowSpacing;
-			float y1 = y;// +floor(0.5f + (dy - s.y) * 0.5f); // center
-			float y2 = y1 + floor((dy - s2.height) * 0.5f); // center
-			for (int i = 0; i < itemCount; ++i )
-			{
-				widgets[i]->setPosition(Rect(x, y1, x + s.width, y1 + s.height));
-				widgets[i+ itemCount]->setPosition(Rect(x2, y2, finalRect.getWidth() + 1, y2 + s2.height));
-				y1 += dy;
-				y2 += dy;
-			}
+		s.height = ceil(s.height);
+		s2.height = ceil(s2.height);
+		float x = 0;
+		float x2 = s.width;
+		int i = 0;
+		float dy = (std::max)(ceil(s.height), ceil(s2.height)) + rowSpacing;
+		float y1;
+		if(useBackwardCompatibleArrangement())
+		{
+			y1 = y; // Buttons align to top.
+		}
+		else
+		{
+			y1 = y + floor(0.5f + (dy - s.height) * 0.5f); // Buttons align to vertical center
+		}
+
+		float y2 = y + floor(0.5f + (dy - s2.height) * 0.5f); // center
+		for (int i = 0; i < itemCount; ++i )
+		{
+			widgets[i]->setPosition(Rect(x, y1, x + s.width, y1 + s.height));
+			widgets[i+ itemCount]->setPosition(Rect(x2, y2, finalRect.getWidth() + 1, y2 + s2.height));
+			y1 += dy;
+			y2 += dy;
 		}
 	}
 	break;
 
 	case ACM_PLAIN:
 		if(!widgets.empty())
-//			widgets[0]->setPosition(finalRect);
 			widgets[0]->setPosition(remainingRect);
 		break;
 
@@ -694,4 +721,47 @@ int32_t ListEntryGui::initialize()
 	onSetValueIn();
 
 	return r;
+}
+
+int32_t ListEntryGui::populateContextMenu(float x, float y, gmpi::IMpUnknown* contextMenuItemsSink)
+{
+	// TODO: hit-test.
+
+	gmpi::IMpContextItemSink* sink;
+	contextMenuItemsSink->queryInterface(gmpi::MP_IID_CONTEXT_ITEMS_SINK, reinterpret_cast<void**>(&sink));
+
+	it_enum_list itr(pinMenuItems);
+
+	for (itr.First(); !itr.IsDone(); ++itr)
+	{
+		int32_t flags = 0;
+
+		// Special commands (sub-menus)
+		switch (itr.CurrentItem()->getType())
+		{
+			case enum_entry_type::Separator:
+			case enum_entry_type::SubMenu:
+				flags |= gmpi_gui::MP_PLATFORM_MENU_SEPARATOR;
+				break;
+
+			case enum_entry_type::SubMenuEnd:
+			case enum_entry_type::Break:
+				continue;
+
+			default:
+				break;
+		}
+
+		sink->AddItem(WStringToUtf8(itr.CurrentItem()->text).c_str(), itr.CurrentItem()->value, flags);
+	}
+
+	return gmpi::MP_OK;
+}
+
+int32_t ListEntryGui::onContextMenu(int32_t selection)
+{
+	pinMenuSelection = selection; // send menu momentarily, then reset.
+	pinMenuSelection = -1;
+
+	return gmpi::MP_OK;
 }

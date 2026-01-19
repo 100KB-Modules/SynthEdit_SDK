@@ -3,7 +3,6 @@
 #include "./Inverter.h"
 #include <algorithm>
 
-
 #ifdef _WIN32
 // Mac appears to turn on AVX2 in *generic* code when we include the headers, so it crashes on non-AVX2 hardware.
 // TODO: disable AVX2 on MAc in gmpi_simd.h so client don't have to worry about it.
@@ -16,6 +15,9 @@ using namespace simd_gmpi;
 #endif
 
 #include "../se_sdk3/mp_sdk_audio.h"
+
+SE_DECLARE_INIT_STATIC_FILE(Inverter)
+SE_DECLARE_INIT_STATIC_FILE(Inverter2)
 
 struct Negate
 {
@@ -100,7 +102,7 @@ public:
 #endif
 #endif
     
-	virtual void onSetPins(void);
+	void onSetPins() override;
 
 private:
 	AudioInPin pinSignalIn;
@@ -114,7 +116,7 @@ Inverter::Inverter()
 	initializePin( pinSignalOut );
 }
 
-void Inverter::onSetPins(void)
+void Inverter::onSetPins()
 {
 	// Set state of output audio pins.
 	pinSignalOut.setStreaming( pinSignalIn.isStreaming() );

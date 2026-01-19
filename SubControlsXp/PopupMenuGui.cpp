@@ -8,6 +8,7 @@ using namespace GmpiDrawing;
 using namespace JmUnicodeConversions;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, PopupMenuGui, L"SE Popup Menu XP" );
+SE_DECLARE_INIT_STATIC_FILE(PopupMenuXP_Gui);
 
 PopupMenuGui::PopupMenuGui()
 {
@@ -57,7 +58,7 @@ int32_t MP_STDCALL PopupMenuGui::onPointerUp(int32_t flags, GmpiDrawing_API::MP1
 		int vertical_size = 0; // for collumns on tall menus.
 		for (itr.First(); !itr.IsDone(); itr.Next())
 		{
-			int32_t flags = itr.CurrentItem()->value == pinChoice ? gmpi_gui::MP_PLATFORM_MENU_TICKED : 0;
+			int32_t flags = !pinMomentary.getValue() && itr.CurrentItem()->value == pinChoice ? gmpi_gui::MP_PLATFORM_MENU_TICKED : 0;
 			if (vertical_size++ == popupMenuWrapRowCount)
 			{
 				flags |= gmpi_gui::MP_PLATFORM_MENU_BREAK;
@@ -66,39 +67,29 @@ int32_t MP_STDCALL PopupMenuGui::onPointerUp(int32_t flags, GmpiDrawing_API::MP1
 
 			auto& txt = itr.CurrentItem()->text;
 
-			if (pinEnableSpecialStrings.getValue() && txt.size() > 3)
+			switch (itr.CurrentItem()->getType())
 			{
-				int i;
-				for (i = 1; i < 4; ++i)
-				{
-					if (txt[0] != txt[i])
-						break;
-				}
+			case enum_entry_type::Separator:
+				flags |= gmpi_gui::MP_PLATFORM_MENU_SEPARATOR;
+				break;
 
-				if (i == 4) // First 4 chars the same.
-				{
-					switch (txt[0])
-					{
-					case L'-':
-						flags |= gmpi_gui::MP_PLATFORM_MENU_SEPARATOR;
-						break;
+			case enum_entry_type::Break:
+				flags |= gmpi_gui::MP_PLATFORM_MENU_BREAK;
+				vertical_size = 1;
+				break;
 
-					case L'|':
-						flags |= gmpi_gui::MP_PLATFORM_MENU_BREAK;
-						vertical_size = 1;
-						break;
+			case enum_entry_type::SubMenu:
+				flags = gmpi_gui::MP_PLATFORM_SUB_MENU_BEGIN; // ignore ticked flag.
+				txt = txt.substr(4);
+				vertical_size = 0; // not quite right, loses count on parent menu.
+				break;
 
-					case L'>':
-						flags = gmpi_gui::MP_PLATFORM_SUB_MENU_BEGIN; // ignore ticked flag.
-						txt = txt.substr(4);
-						vertical_size = 0; // not quite right, loses count on parent menu.
-						break;
+			case enum_entry_type::SubMenuEnd:
+				flags |= gmpi_gui::MP_PLATFORM_SUB_MENU_END;
+				break;
 
-					case L'<':
-						flags |= gmpi_gui::MP_PLATFORM_SUB_MENU_END;
-						break;
-					}
-				}
+			case enum_entry_type::Normal:
+				break;
 			}
 
 			nativeMenu.AddItem(txt, itr.CurrentItem()->value, flags);
@@ -118,12 +109,18 @@ void PopupMenuGui::OnPopupComplete(int32_t result)
 {
 	if (result == gmpi::MP_OK)
 	{
-		pinChoice = nativeMenu.GetSelectedId();
+		// BUG: Increment module and possibly others don't respond to momentary,
+		// would be better to go ...[val]->[-1].....[val]->-1].... on each selection. This would trigger trailing-edge detection correctly.
+		// currently it's [-1]->[val]..........[-1]->[val]
 
-		if (pinMomentary)
+		// SE 1.5, for better compatibility with non-momentary lists,
+		// Drops to -1 ONLY on re-select of current value.
+		if (pinMomentary.getValue() && nativeMenu.GetSelectedId() == pinChoice)
 		{
 			pinChoice = -1;
 		}
+
+		pinChoice = nativeMenu.GetSelectedId();
 	}
 
 	nativeMenu.setNull(); // release it.

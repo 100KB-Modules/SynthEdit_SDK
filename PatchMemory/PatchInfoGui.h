@@ -1,7 +1,7 @@
 #ifndef PATCHINFOGUI_H_INCLUDED
 #define PATCHINFOGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 
 class PatchInfoGui : public MpGuiBase
 {
@@ -39,10 +39,6 @@ private:
  	IntGuiPin patchCommandOut;
  	StringGuiPin patchCommandListIn;
  	StringGuiPin patchCommandListOut;
-	StringGuiPin CategoryIn;
-	StringGuiPin CategoryOut;
 };
 
 #endif
-
-

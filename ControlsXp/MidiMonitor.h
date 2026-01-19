@@ -9,6 +9,7 @@
 #include "../se_sdk3/mp_midi.h"
 #include "../se_sdk3/it_enum_list.h"
 
+using namespace gmpi;
 using namespace GmpiMidi;
 
 class MonitorBase : public MpBase2
@@ -27,11 +28,14 @@ protected:
 	std::vector<std::wstring> CONTROLLER_DESCRIPTION;
 	static const wchar_t* CONTROLLER_ENUM_LIST;
 
+	float midi2NoteTune[256];
+	uint8_t midi2NoteToKey[256];
+
 public:
 	MonitorBase()
 	{
-		memset(noteStatus, sizeof(noteStatus), 0);
-		memset(noteStatusTimestamps, sizeof(noteStatusTimestamps), 0);
+		memset(noteStatus, 0, sizeof(noteStatus));
+		memset(noteStatusTimestamps, 0, sizeof(noteStatusTimestamps));
 		samplesPassed = 0;
 		lines.push_back(L"Sound ON");
 
@@ -61,6 +65,12 @@ public:
 				}
 			}
 		}
+
+		for (size_t i = 0; i < std::size(midi2NoteToKey); ++i)
+		{
+			midi2NoteToKey[i] = static_cast<uint8_t>(i);
+			midi2NoteTune[i] = static_cast<float>(i);
+		}
 	}
 
 	void subProcess(int sampleFrames)
@@ -79,42 +89,209 @@ public:
 		pinDispOut = lines.back();
 	}
 	/* never called, no non-midi pins
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
-	// Set processing method.
-	setSubProcess(&MidiMonitor::subProcess);
-
-	setSleep(false);
-
-	pinDispOut = lines.back();
 	}
 	*/
 
-/*
-	std::wstring generateTimeString()
-	{
-		int rate = (int)getSampleRate();
-
-		int64_t currentSample = samplesPassed + getBlockPosition();
-		int64_t seconds = (int64_t)currentSample / rate;
-		int64_t samples = currentSample - seconds * rate;
-		int64_t minutes = seconds / 60;
-
-		std::wstring samplesText = to_wstring(samples) + L"s";
-		std::wstring secondsText = to_wstring(seconds) + L"sec";
-		std::wstring minutesText = to_wstring(minutes) + L"min";
-
-		return L" " + minutesText + secondsText + samplesText;
-	}
-*/
 	void onMidiMessage(int pin, const unsigned char* midiMessage, int size) override
 	{
-		//		wstring newMessage = midiToString.convert(size, midiMessage);
-		//		wstring timeText = generateTimeString();
-
-		//		msg = newMessage + timeText + L"\n" + msg + L"\n";
+		midi::message_view msg((const uint8_t*) midiMessage, size);
 
 		std::wstring newMessage;
+
+		if (gmpi::midi_2_0::isMidi2Message(msg))
+		{
+			std::wostringstream oss;
+
+			const auto header = gmpi::midi_2_0::decodeHeader(msg);
+
+			oss << L"2C" << (header.channel + 1) << " ";
+
+			if (header.messageType == gmpi::midi_2_0::ChannelVoice64)
+			{
+				// Monophonic Controllers.
+				switch (header.status)
+				{
+				case gmpi::midi_2_0::ControlChange:
+				{
+					const auto controller = gmpi::midi_2_0::decodeController(msg);
+
+					std::wstring desc;
+					
+					if (controller.type < 128)
+					{
+						desc = CONTROLLER_DESCRIPTION[controller.type];
+					}
+					else
+					{
+						desc = std::to_wstring(controller.type);
+					}
+
+					// remove CC number from description. Trim to 20 char.
+					size_t p = desc.find(L'-');
+
+					if (p != std::string::npos)
+					{
+						desc = desc.substr(p, (std::min)(desc.size() - p, (size_t)20));
+					}
+					
+					const auto percentage = static_cast<int>(floorf(0.5f + controller.value * 100.0f));
+
+//					oss << L"CC" << controller.type << ": " << std::fixed << std::setprecision(3) << std::showpos << percentage << "% " << desc;
+
+					oss << L"CC " << desc
+						<< std::fixed << std::setprecision(3) << std::showpos << std::setw(5) << std::setfill(L' ')
+						<< percentage << "%";
+				}
+				break;
+
+				case gmpi::midi_2_0::RPN:
+                {
+                    const auto rpn = gmpi::midi_2_0::decodeRpn(msg);
+
+                    oss << L"RPN " << rpn.rpn << " :" << rpn.value;
+                }
+				break;
+
+				case gmpi::midi_2_0::NoteOn:
+				{
+					const auto note = gmpi::midi_2_0::decodeNote(msg);
+
+					const auto keyNumber = static_cast<uint8_t>(static_cast<int>(floorf(0.5f + midi2NoteTune[note.noteNumber])) & 0x7f);
+					midi2NoteToKey[note.noteNumber] = keyNumber;
+
+					float tempPitch = midi2NoteTune[note.noteNumber];
+					if (gmpi::midi_2_0::attribute_type::Pitch == note.attributeType)
+					{
+						tempPitch = note.attributeValue;
+					}
+
+					oss << L"Note On  (" << note.noteNumber << ", " << std::setprecision(2) << note.velocity << ")";
+					// display pitch if not default for that key
+					if (tempPitch != (float)note.noteNumber)
+					{
+						oss << " P" << tempPitch;
+					}
+				}
+				break;
+
+				case gmpi::midi_2_0::NoteOff:
+				{
+					const auto note = gmpi::midi_2_0::decodeNote(msg);
+
+					//oss.precision(2);
+					//oss.setf(std::ios::fixed, std::ios::floatfield);
+					oss << L"Note Off  (" << note.noteNumber << ", " << std::setprecision(2) << note.velocity << ")";
+
+					// reset pitch of note number.
+					midi2NoteToKey[note.noteNumber] = note.noteNumber;
+				}
+				break;
+
+				case gmpi::midi_2_0::PolyControlChange:
+				{
+					const auto polyController = gmpi::midi_2_0::decodePolyController(msg);
+
+					if (polyController.type == gmpi::midi_2_0::PolyPitch)
+					{
+						const auto semitones = gmpi::midi_2_0::decodeNotePitch(msg);
+						midi2NoteTune[polyController.noteNumber] = semitones;
+					}
+
+//					oss << L"PolyCC (" << polyController.type << L", " << polyController.noteNumber << L", " << std::setw(3) << polyController.value << L")";
+     
+                    std::wstring desc;
+					
+					if (polyController.type < 128)
+					{
+						desc = CONTROLLER_DESCRIPTION[polyController.type];
+					}
+					else
+					{
+						desc = std::to_wstring(polyController.type);
+					}
+
+					// remove CC number from description. Trim to 20 char.
+					size_t p = desc.find(L'-');
+
+					if (p != std::string::npos)
+					{
+						desc = desc.substr(p, (std::min)(desc.size() - p, (size_t)20));
+					}
+     
+                    const auto percentage = static_cast<int>(floorf(0.5f + polyController.value * 100.0f));
+
+//					oss << L"CC" << controller.type << ": " << std::fixed << std::setprecision(3) << std::showpos << percentage << "% " << desc;
+
+					oss << L"PolyCC " << polyController.type << desc << L" N" << polyController.noteNumber << L" "
+						<< std::fixed << std::setprecision(3) << std::showpos << std::setw(5) << std::setfill(L' ')
+						<< percentage << "%";
+
+				}
+				break;
+
+				case gmpi::midi_2_0::PolyBender:
+					oss << L"PolyBender";
+				break;
+
+				case gmpi::midi_2_0::PolyAfterTouch:
+				{
+					const auto aftertouch = gmpi::midi_2_0::decodePolyController(msg);
+					oss << L"PolyAfterTouch  (" << aftertouch.noteNumber << "," << aftertouch.value << ")";
+				}
+				break;
+
+				case gmpi::midi_2_0::PolyNoteManagement:
+					oss << L"PolyNoteManagement";
+				break;
+
+				case gmpi::midi_2_0::ProgramChange:
+				{
+					// Note: banks and programs number from 1
+					if (msg[3] & 1)
+					{
+						oss << L"BankChang " << 1 + ((msg[6] << 7) | msg[7]);
+					}
+					oss << L"ProgramChang " << 1 + msg[4];
+				}
+				break;
+
+				case gmpi::midi_2_0::ChannelPressue:
+                {
+                    const auto chanPressure = gmpi::midi_2_0::decodeController(msg);
+                    oss << L"ChannelPressue " << chanPressure.value;
+                }
+				break;
+
+				case gmpi::midi_2_0::PitchBend:
+				{
+					const auto normalized = gmpi::midi_2_0::decodeController(msg).value;
+					const auto bend = floorf(0.5f + normalized * 200.0f - 100.f);
+
+					oss << L"PitchBend "
+						<< std::fixed << std::setprecision(3) << std::showpos << std::setw(5) << std::setfill(L' ')
+						<< static_cast<int>(bend) << "%";
+				}
+				break;
+
+				}
+			}
+
+			if (oss.str().empty())
+			{
+                oss << std::setprecision(2) << std::hex;
+                for(int i = 0 ; i < (std::min)(8, (int) msg.size()) ; ++i)
+                {
+                    oss << (int) msg[i] << " ";
+                }
+			}
+
+			{
+				newMessage = oss.str();
+			}
+		}
+		else // MIDI 1.0
 		{
 			int stat, byte1, byte2, chan; // 3 bytes of MIDI message
 			chan = midiMessage[0] & 0x0f;
@@ -162,7 +339,7 @@ public:
 					break;
 
 				case MIDI_PolyAfterTouch:
-					oss << L"Aftertouch  (" << byte1 << "," << byte2 << ")";
+					oss << L"PolyAfterTouch  (" << byte1 << "," << byte2 << ")";
 					newMessage = oss.str();
 					break;
 
@@ -193,22 +370,20 @@ public:
 				break;
 
 				case MIDI_ProgramChange:
-					//newMessage.Format((L"Prg change (%3d)"), byte1 + 1 );
 					oss << L"Prg change  (" << (byte1 + 1) << ")";
 					newMessage = oss.str();
 					break;
 
 				case MIDI_ChannelPressue:
-					//newMessage.Format((L"Channel Pressure (%3d)"), byte1);
 					oss << L"Channel Pressure  (" << byte1 << ")";
 					newMessage = oss.str();
 					break;
 
 				case MIDI_PitchBend:
 				{
-					int val = (byte2 << 7) + byte1 - 8192;
-					float normalized = val / 8192.0f;
-					//		newMessage.Format((L"Bender (%.3d) %.3f"), val, normalized );
+					const int val = (byte2 << 7) + byte1 - 8192;
+					const auto normalized = (midi::utils::bipoler14bitToNormalized(byte2, byte1) * 2.0f) - 1.0f; // -1.0 -> + 1.0
+
 					oss << L"Bender  (" << val << ") " << normalized;
 					newMessage = oss.str();
 				}
@@ -307,6 +482,7 @@ public:
 								int tune = (tuneEntry[0] << 14) + (tuneEntry[1] << 7) + tuneEntry[2];
 								float semitone = tune / (float)0x4000;
 
+								oss.precision(6);
 								oss << L"TUNE: k" << midiKeyNumber << " " << semitone;
 							}
 						}
@@ -378,7 +554,7 @@ public:
 							else
 							{
 								// REgualr SYSEX
-								int c = min(size, 10);
+								int c = (std::min)(size, 10);
 								oss << L"SYSEX";
 
 								for (int i = 0; i < c; i++)
@@ -456,11 +632,8 @@ public:
 
 				if (!is_system_msg)
 				{
-					//std::wstring chan_st;
-					//chan_st.Format((L"C%2d "),chan+1);
 					std::wostringstream oss2;
-					oss2 << L"C" << (chan + 1) << " ";
-					// newMessage = oss.str();
+					oss2 << L"1C" << (chan + 1) << " ";
 					newMessage = oss2.str() + newMessage;
 				}
 
@@ -480,12 +653,18 @@ public:
 					newMessage = newMessage.substr(lineLength) + std::wstring(L"\n                            ") + newMessage.substr(lineLength);
 				}
 
-				//				newMessage += L"\n";
-				//		_RPTW1(_CRT_WARN, L"midimon: %s\n", newMessage );
+//				_RPTW1(_CRT_WARN, L"MM: %s\n", newMessage );
 				//				Print(newMessage);
 			}
 		}
 		lines.push_back(newMessage);
+
+#ifdef _DEBUG
+		if (newMessage.find(L"Note On") != std::string::npos)
+		{
+			_RPTW1(_CRT_WARN, L"MM: %s\n", newMessage.c_str());
+		}
+#endif
 		if (lines.size() > 14)
 			lines.pop_front();
 

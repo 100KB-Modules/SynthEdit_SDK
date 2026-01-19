@@ -1,6 +1,8 @@
 #ifndef IMPULSERESPONSEGUI_H_INCLUDED
 #define IMPULSERESPONSEGUI_H_INCLUDED
 
+#if defined(_WIN32) && !defined(_WIN64)
+
 #include "../se_sdk3/MP_SDK_GUI.h"
 
 class ImpulseResponseGui : public SeGuiCompositedGfxBase
@@ -21,6 +23,7 @@ private:
 	float displayDbRange;
 };
 
+#endif
 #endif
 
 

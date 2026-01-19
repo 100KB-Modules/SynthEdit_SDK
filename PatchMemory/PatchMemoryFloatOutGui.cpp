@@ -3,6 +3,7 @@
 // This module replaces two older modules.  Difference is one has a 'Value' in pin, other don't (it's hidden so I can share the code).
 REGISTER_GUI_PLUGIN( PatchMemoryFloatOutGui, L"SE PatchMemory Float Out" );
 REGISTER_GUI_PLUGIN( PatchMemoryFloatOutGui, L"SE PatchMemory Float Out B2" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryFloatOut_Gui);
 
 // handy macro to save typing.
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryFloatOutGui::on##name##Changed ) );

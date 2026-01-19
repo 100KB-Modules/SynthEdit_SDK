@@ -1,10 +1,7 @@
 #include "./my_type_convert.h"
 
-#if _MSC_VER >= 1600 // Not Avail in VS2005.
-//#include <locale>
+#include <locale>
 #include <codecvt>
-//#include <cvt//wstring>
-#endif
 
 using namespace std;
 
@@ -28,9 +25,21 @@ bool myTypeConvert( wstring value )
 };
 
 template<>
+bool myTypeConvert( string value )
+{
+	return strcmp( value.c_str(), "1") == 0;
+};
+
+template<>
 int myTypeConvert( wstring value )
 {
 	return wcstol( value.c_str(), 0 , 10 );
+};
+
+template<>
+int myTypeConvert( string value )
+{
+	return strtol( value.c_str(), 0 , 10 );
 };
 
 template<>
@@ -40,11 +49,25 @@ float myTypeConvert( wstring value )
 };
 
 template<>
+float myTypeConvert( string value )
+{
+	return (float) strtod( value.c_str(), 0 );
+};
+
+template<>
 wstring myTypeConvert( bool value )
 {
 	if( value )
 		return L"1";
 	return L"0";
+};
+
+template<>
+string myTypeConvert( bool value )
+{
+	if( value )
+		return "1";
+	return "0";
 };
 
 template<>
@@ -58,6 +81,12 @@ wstring myTypeConvert( int value )
 	swprintf( stringval, maxSize, L"%d", value );
 #endif
 	return stringval;
+};
+
+template<>
+string myTypeConvert( int value )
+{
+	return std::to_string(value);
 };
 
 template<>
@@ -84,6 +113,27 @@ wstring myTypeConvert( float value )
 
 	return stringval;
 };
+
+template<>
+string myTypeConvert( float value )
+{
+	return std::to_string(value);
+};
+
+
+template<>
+std::wstring myTypeConvert(std::string value)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
+	return convert.from_bytes(value);
+}
+
+template<>
+std::string myTypeConvert(std::wstring value)
+{
+	std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
+	return convert.to_bytes(value);
+}
 
 template<>
 wstring myTypeConvert( MpBlob value )
@@ -185,60 +235,9 @@ string UnicodeToAscii(wstring s) // Actually to UTF8.
 {
 	if( s.empty() )
 	{
-		return string("");
+		return {};
 	}
-/*
-	int string_length = s.size();
-	char* temp = new char[string_length];
-	WideCharToMultiByte(CP_ACP, 0, s.c_str(), -1, temp, string_length, NULL, NULL);
 
-	std::string returnValue( temp, string_length );
-	delete [] temp;
-
-	return returnValue;
-*/
-#if _MSC_VER >= 1600 // Not Avail in VS2005.
 	std::wstring_convert<std::codecvt_utf8<wchar_t>> convert;
 	return convert.to_bytes(s);
-    
-#else
-    
-    std::string out;
-    unsigned int codepoint = 0;
-    for (const wchar_t* in = s.c_str(); *in != 0;  ++in)
-    {
-        if (*in >= 0xd800 && *in <= 0xdbff)
-            codepoint = ((*in - 0xd800) << 10) + 0x10000;
-        else
-        {
-            if (*in >= 0xdc00 && *in <= 0xdfff)
-                codepoint |= *in - 0xdc00;
-            else
-                codepoint = *in;
-            
-            if (codepoint <= 0x7f)
-                out.append(1, static_cast<char>(codepoint));
-            else if (codepoint <= 0x7ff)
-            {
-                out.append(1, static_cast<char>(0xc0 | ((codepoint >> 6) & 0x1f)));
-                out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
-            }
-            else if (codepoint <= 0xffff)
-            {
-                out.append(1, static_cast<char>(0xe0 | ((codepoint >> 12) & 0x0f)));
-                out.append(1, static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
-                out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
-            }
-            else
-            {
-                out.append(1, static_cast<char>(0xf0 | ((codepoint >> 18) & 0x07)));
-                out.append(1, static_cast<char>(0x80 | ((codepoint >> 12) & 0x3f)));
-                out.append(1, static_cast<char>(0x80 | ((codepoint >> 6) & 0x3f)));
-                out.append(1, static_cast<char>(0x80 | (codepoint & 0x3f)));
-            }
-            codepoint = 0;
-        }
-    }
-    return out;
-#endif
 }

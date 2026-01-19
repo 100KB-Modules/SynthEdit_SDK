@@ -17,7 +17,7 @@ public:
 	ImpulseResponse( IMpUnknown* host );
 	void subProcess( int bufferOffset, int sampleFrames );
 	void subProcessIdle( int bufferOffset, int sampleFrames );
-	virtual void onSetPins(void);
+	void onSetPins() override;
 
 private:
 	AudioInPin pinImpulsein;
@@ -26,7 +26,6 @@ private:
 	BlobOutPin pinResults;
 	FloatOutPin pinSampleRateToGui;
 
-	float results[FFT_SIZE];
 	float buffer[FFT_SIZE];
 
 private:
@@ -35,14 +34,9 @@ private:
 	short scale_type;
 	float* input_ptr;
 	int m_idx;
-	void printResult(void);
-	int bitreverse[FFT_SIZE]; // reversed bits
-	float realArray[FFT_SIZE];
-	float imagArray[FFT_SIZE];
+	void printResult();
 	float window[FFT_SIZE];
-
 	int m_spectrum_size;
-
 };
 
 #endif

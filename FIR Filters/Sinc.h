@@ -1,15 +1,14 @@
+#pragma once
 #ifndef SINC_FILTER_H_INCLUDED
 #define SINC_FILTER_H_INCLUDED
 
-#include <string.h>
-#include <assert.h>
-#include <xmmintrin.h>
-
-/* 
-#include "SincFilter.h"
+/*
+#include "Sinc.h"
 */
 
-#pragma once
+#include <string.h>
+#include <assert.h>
+#include "../shared/xp_simd.h"
 
 #define _USE_MATH_DEFINES
 #include <math.h>
@@ -18,23 +17,54 @@
 #include <iomanip>
 #endif
 
-inline void calcWindowedSinc( double cutoff, int sincTapCount, float* returnSincTaps )
+inline void calcWindowedSinc( double cutoff, bool isHighPass, int sincTapCount, float* returnSincTaps )
 {
-	double r_g,r_w,r_a,r_snc; // some local variables
-	r_g = 2 * cutoff;         // Calc gain correction factor
+	double r_g,r_w,r_a,r_snc;	// some local variables
+	r_g = 2.f * cutoff;         // Calc gain correction factor
+	const int centerTap = sincTapCount / 2;
+	const float minimumkHz = 0.0000001f;
 
-	for( int k = 0; k < sincTapCount; ++k ) // For 1 window width
+	if (cutoff < minimumkHz)
+	{
+		for (int k = 0; k < sincTapCount; ++k)
+			returnSincTaps[k] = 0.0f;
+
+		if (isHighPass)
+			returnSincTaps[centerTap] = -1.0f;
+
+		return;
+	}
+
+	double filterInvertConst = 2.0 * M_PI * cutoff;
+	if (isHighPass)
+		filterInvertConst = -filterInvertConst;
+#if 1
+	for (int k = 0; k < sincTapCount; ++k) // For 1 window width
 	{
 		int i = sincTapCount / 2 - k;       // Calc input sample index
 
 		// calculate von Hann Window. Scale and calculate Sinc
-		r_w = 0.5 - 0.5 * cos( 2.0 * M_PI * ( 0.5 + i / (double) sincTapCount ) );
-		r_a     = 2.0 * M_PI * i * cutoff;
+		r_w = 0.5 - 0.5 * cos(2.0 * M_PI * (0.5 + i / (double)sincTapCount));	// Window
+		r_a = filterInvertConst * i;											// Filter
 		r_snc = sin(r_a) / r_a;
 
-		returnSincTaps[k] = (float) (r_g * r_w * r_snc);
+		returnSincTaps[k] = (float)(r_g * r_w * r_snc);
 	}
-	returnSincTaps[sincTapCount / 2] = (float)r_g; // correct divide-by-zero in loop.
+#else
+	for (int i = 1; i < sincTapCount / 2; ++i) // For 1 window width
+	{
+		// calculate von Hann Window. Scale and calculate Sinc
+		r_w = 0.5 - 0.5 * cos(2.0 * M_PI * (0.5 + i / (double)sincTapCount));	// Window
+		r_a = filterInvertConst * i;											// Filter
+		r_snc = sin(r_a) / r_a;
+
+		returnSincTaps[centerTap + i] = returnSincTaps[centerTap - i] = (float)(r_g * r_w * r_snc);
+	}
+#endif
+	if (isHighPass)
+		returnSincTaps[centerTap] = static_cast<float>(-1.0 + r_g); // correct divide-by-zero in loop.
+	else
+		returnSincTaps[centerTap] = (float)r_g; // correct divide-by-zero in loop.
 }
 
 struct SincFilterCoefs
@@ -44,7 +74,7 @@ struct SincFilterCoefs
 
 	inline void InitCoefs( int oversampleFactor_ )
 	{
-		calcWindowedSinc( 0.5 / oversampleFactor_, numCoefs_, coefs_ );
+		calcWindowedSinc( 0.5 / oversampleFactor_, false, numCoefs_, coefs_ );
 	}
 };
 
@@ -84,7 +114,7 @@ public:
 	// Process single sample returning filter output.
 	inline float ProcessFiSingle( float* history, const SincFilterCoefs& coefs )
 	{
-#if 0 // non SSE.
+#ifndef GMPI_SSE_AVAILABLE
 		// convolution.
 		float sum = 0;
 		int x = 0;
@@ -112,8 +142,14 @@ public:
 			pIn1 += 4;
 		}
 
-		return sum1.m128_f32[0] + sum1.m128_f32[1] + sum1.m128_f32[2] + sum1.m128_f32[3];
-
+		// horizontal add
+// wrong		return sum1[0] + sum1[1] + sum1[2] + sum1[3];
+		// more correct to use _mm_store_ss. (not meant to access contents of __m128 directly, might be in register).
+		__m128 t = _mm_add_ps(sum1, _mm_movehl_ps(sum1, sum1));
+		auto sum2 = _mm_add_ss(t, _mm_shuffle_ps(t, t, 1));
+		float sum;
+		_mm_store_ss(&sum, sum2);
+		return sum;
 #endif
 	}
 
@@ -122,7 +158,7 @@ public:
 	{
 		ProcessHistory( in, coefs.numCoefs_ );
 
-#if 0 // non SSE.
+#ifndef GMPI_SSE_AVAILABLE
 		// convolution.
 		float sum = 0;
 		int x = histIdx;
@@ -186,8 +222,15 @@ public:
 		}
 		sum1 = _mm_add_ps( sum2, sum1 );
 #endif
-		return sum1.m128_f32[0] + sum1.m128_f32[1] + sum1.m128_f32[2] + sum1.m128_f32[3];
+		// horizontal add
+// wrong		return sum1[0] + sum1[1] + sum1[2] + sum1[3];
+		// more correct to use _mm_store_ss. (not meant to access contents of __m128 directly, might be in register).
+		__m128 t = _mm_add_ps(sum1, _mm_movehl_ps(sum1, sum1));
+		auto sum2 = _mm_add_ss(t, _mm_shuffle_ps(t, t, 1));
+		float sum;
+		_mm_store_ss(&sum, sum2);
 
+		return sum;
 
 		/* slower
 		// horizontal add.

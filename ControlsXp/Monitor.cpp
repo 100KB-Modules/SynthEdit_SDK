@@ -1,4 +1,8 @@
 #include "MidiMonitor.h"
+#include <thread>
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 using namespace gmpi;
 
@@ -182,7 +186,7 @@ public:
 		Print(msg);
 	}
 
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
 		// Check which pins are updated.
 		if( pinSignalin.isUpdated() )
@@ -243,7 +247,8 @@ public:
 		if( pinEngineOverloadtest.isUpdated() )
 		{
 			if (pinEngineOverloadtest.getValue())
-				Sleep(300);
+				//				Sleep(300);
+				std::this_thread::sleep_for(300ms);
 		}
 
 		// Set state of output audio pins.

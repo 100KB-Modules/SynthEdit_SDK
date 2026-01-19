@@ -18,11 +18,15 @@ inline float ComputeIncrement2( const float* pitchTable, float pitch )
 {
 	const float maxPitchValue = pitchTableHiVolts * 0.1f;
 	const float minPitchValue = pitchTableLowVolts * 0.1f;
-	if( pitch > maxPitchValue )
+	if (!(pitch < maxPitchValue)) // reverse test to catch also Nans.
+	{
 		pitch = maxPitchValue;
-
-	if( pitch < minPitchValue )
-		pitch = minPitchValue;
+	}
+	else
+	{
+		if (pitch < minPitchValue)
+			pitch = minPitchValue;
+	}
 
 	pitch *= 120.0f;
 
@@ -82,33 +86,6 @@ public:
 	enum { Active = true };
 };
 
-class ResonanceFixed
-{
-public:
-	inline static void CalcInitial( const float* stabilityTable, float resonance, float& returnMaxStableF1, float& returnQuality )
-	{
-		// limit q to resonable values (under 9.992V)
-		float q = resonance;
-		q = std::max( q, 0.f );
-		q = std::min( q, 0.9992f );
-		returnQuality = 2.f - 2.f * q; // map to 0 - 2.0 range.
-
-		q *= 512.f;
-
-		int tableFloor = FastRealToIntTruncateTowardZero(q);
-		returnMaxStableF1 = stabilityTable[ tableFloor ];
-	}
-	inline static void Calculate( const float* stabilityTable, float resonance, float& returnMaxStableF1, float& returnQuality )
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	inline static void IncrementPointer( const float* pitch )
-	{
-		// do nothing. Hopefully optimizes away to nothing.
-	}
-	enum { Active = false };
-};
-
 class ResonanceChanging
 {
 public:
@@ -124,7 +101,7 @@ public:
 		q = std::min( q, 0.9992f );
 		returnQuality = 2.f - 2.f * q; // map to 0 - 2.0 range
 
-		int tableFloor = FastRealToIntTruncateTowardZero(q); // fast float-to-int using SSE. truncation toward zero.
+		const int tableFloor = FastRealToIntTruncateTowardZero(q * 512.f); // fast float-to-int using SSE. truncation toward zero.
 		returnMaxStableF1 = stabilityTable[ tableFloor ];
 	}
 	inline static void IncrementPointer( float*& pitch )
@@ -132,6 +109,24 @@ public:
 		++pitch;
 	}
 	enum { Active = true };
+};
+
+class ResonanceFixed
+{
+public:
+	inline static void CalcInitial( const float* stabilityTable, float resonance, float& returnMaxStableF1, float& returnQuality )
+	{
+		return ResonanceChanging::Calculate(stabilityTable, resonance, returnMaxStableF1, returnQuality);
+	}
+	inline static void Calculate( const float* stabilityTable, float resonance, float& returnMaxStableF1, float& returnQuality )
+	{
+		// do nothing. Hopefully optimizes away to nothing.
+	}
+	inline static void IncrementPointer( const float* pitch )
+	{
+		// do nothing. Hopefully optimizes away to nothing.
+	}
+	enum { Active = false };
 };
 
 class FilterModeLowPass
@@ -253,7 +248,7 @@ public:
 	}
 
 	virtual int32_t MP_STDCALL open() override;
-	virtual void onSetPins(void) override;
+	virtual void onSetPins() override;
 	virtual void ChoseProcessMethod();
 
 	void StabilityCheck() override;
@@ -266,7 +261,7 @@ public:
 	{
 		return pinOutput;
 	}
-	virtual void OnFilterSettled() override
+	void OnFilterSettled() override
 	{
 		if (pinMode != 0 && pinMode != 3) // LP, BR
 		{

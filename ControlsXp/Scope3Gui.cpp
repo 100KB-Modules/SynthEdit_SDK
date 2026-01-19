@@ -21,9 +21,10 @@ using namespace GmpiDrawing_API;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, Scope3Gui, L"SE Scope3 XP");
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, Scope3Gui, L"SE TrigScope3 XP");
+SE_DECLARE_INIT_STATIC_FILE(Scope3XP_Gui);
 
 #ifndef _WIN32
-int32_t timeGetTime(void) // MacOS version
+int32_t timeGetTime() // MacOS version
 {
     timeval t1;
 
@@ -43,7 +44,7 @@ newestVoice_( 0 )
 
 	for( int i = 0 ; i < MP_VOICE_COUNT ; ++i )
 	{
-		VoiceLastUpdated[i] = std::chrono::steady_clock::now(); // +std::chrono::milliseconds(600);
+		VoiceLastUpdated[i] = std::chrono::steady_clock::now();
 	}
 }
 
@@ -287,7 +288,7 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 	float scale = height * 0.46f;;
 	float mid_y = floorf(0.5f + height * 0.5f);
 
-#if 1 //def _WIN32 // cause crash at present on mac
+#if 1
 	if (cachedBackground_.isNull())
 	{
 		float mid_x = floorf(0.5f + width * 0.5f);
@@ -295,7 +296,6 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
         GmpiDrawing::Size mysize(r.getWidth(), r.getHeight());
 		auto dc = g.CreateCompatibleRenderTarget(mysize);
 		dc.BeginDraw();
-//		dc.Clear(Color((uint32_t)0, 0.0f));
 
 		if (true) // fontInfo_.colorBackground >= 0 ) // -1 indicates transparent background
 		{
@@ -309,7 +309,7 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 		darked_col.g *= 0.5f;
 		darked_col.b *= 0.5f;
 
-		auto brush2 = g.CreateSolidColorBrush(darked_col);
+		auto brush2 = dc.CreateSolidColorBrush(darked_col);
 
 		// BACKGROUND LINES
 		// horizontal line
@@ -341,7 +341,20 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 		brush2.SetColor(typeface_->getColor());
 		if (height > 30)
 		{
-			const float fontBoxSize = 12;
+			float yOffset;
+			float fontBoxSize;
+			if(typeface_->verticalSnapBackwardCompatibilityMode)
+			{
+				fontBoxSize = 12;
+				yOffset = -fontBoxSize / 2;
+			}
+			else
+			{
+				const auto metrics = dtextFormat.GetFontMetrics();
+				fontBoxSize = metrics.bodyHeight();
+				yOffset = metrics.capHeight * 0.5 - metrics.ascent;
+			}
+
 			for (int v = -10; v < 11; v += 5)
 			{
 				char txt[10];
@@ -349,7 +362,7 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 				sprintf(txt, "%2.0f", (float)v);
 
 				float tx = mid_x + tick_width;
-				float ty = mid_y - (int)y - fontBoxSize / 2;
+				float ty = mid_y - (int)y + yOffset;
 				GmpiDrawing::Rect textRect(tx, ty, tx + 100, ty + fontBoxSize);
 				dc.DrawTextU(txt, dtextFormat, textRect, brush2);
 			}
@@ -505,11 +518,27 @@ int32_t Scope3Gui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 
 int32_t MP_STDCALL Scope3Gui::initialize()
 {
-	dtextFormat = GetTextFormat(getHost(), getGuiHost(), "tty", &typeface_);
+	dtextFormat = FontCache::instance()->GetCustomTextFormat(
+		getHost(),
+		getGuiHost(),
+		"Custom:Scope3Gui",
+		"tty",
+		[=](FontMetadata* customFont) -> void
+			{
+				if(!customFont->verticalSnapBackwardCompatibilityMode)
+				{
+					customFont->bodyHeight_ = customFont->pixelHeight_;
+					customFont->bodyHeightDigitsOnly_ = false;
+					customFont->vst3_vertical_offset_ = 0;
+				}
 
-	dtextFormat.SetTextAlignment(TextAlignment::Leading); // Left
-	dtextFormat.SetParagraphAlignment(ParagraphAlignment::Center);
-	dtextFormat.SetWordWrapping(WordWrapping::NoWrap); // prevent word wrapping into two lines that don't fit box.
+				customFont->faceFamilies_[0] = "Arial";
+				customFont->setTextAlignment(GmpiDrawing::TextAlignment::Leading);
+				customFont->wordWrapping = GmpiDrawing::WordWrapping::NoWrap;
+				customFont->paragraphAlignment = GmpiDrawing::ParagraphAlignment::Center;
+			},
+		&typeface_
+	);
 
 	return MpGuiGfxBase::initialize();
 }

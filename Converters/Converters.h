@@ -14,7 +14,7 @@ public:
 		initializePin( 1, outputValue );
 	}
 
-	void onSetPins(void)
+	void onSetPins()
 	{
 		if( inputValue.isUpdated() )
 		{

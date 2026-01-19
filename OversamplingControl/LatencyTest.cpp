@@ -29,7 +29,7 @@ void LatencyTest::subProcess( int sampleFrames )
 	}
 }
 
-void LatencyTest::onSetPins(void)
+void LatencyTest::onSetPins()
 {
 	// Set state of output audio pins.
 	pinSignalOut.setStreaming(pinSignalIn.isStreaming());

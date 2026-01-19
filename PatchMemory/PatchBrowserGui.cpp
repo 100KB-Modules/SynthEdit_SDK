@@ -1,20 +1,22 @@
 #include "../se_sdk3/mp_sdk_gui2.h"
 #include <sstream>
-//#include <filesystem>
-#include "../shared/FileFinder.h"
 #include "../shared/it_enum_list.h"
-#include "../shared/unicode_conversion.h"
 
+using namespace std;
 using namespace gmpi;
-using namespace JmUnicodeConversions;
 
-//namespace fs = std::experimental::filesystem::v1;
+struct presetinfo
+{
+	int index;
+	wstring category;
+	wstring name;
+};
 
 class PatchBrowserGui : public SeGuiInvisibleBase
 {
 	IntGuiPin programIn;
 	StringGuiPin programNamesListIn;
-//	StringGuiPin programCategoriesListIn;
+	StringGuiPin programCategoriesListIn;
 	IntGuiPin patchCommandIn;
 	StringGuiPin patchCommandListIn;
 
@@ -22,86 +24,20 @@ class PatchBrowserGui : public SeGuiInvisibleBase
  	StringGuiPin pinPresetNamesList;
 	IntGuiPin patchCommandOut;
 	StringGuiPin patchCommandListOut;
-    
-    platform_string presetExtension()
-    {
-#ifdef _WIN32
-        return _T("vstpreset");
-#else
-        return _T("aupreset");
-#endif
-    }
-
-	std::string getVst3PresetsFolder()
-	{
-		gmpi_sdk::MpString vst3PresetFolderString;
-		getHost()->FindResourceU("__nativePresetsFolder", "", &vst3PresetFolderString);
-		return vst3PresetFolderString.str();
-	}
-
-	std::wstring getNativePresetsList()
-	{
-		platform_string PresetFolder = toPlatformString(getVst3PresetsFolder());
-
-		auto extension = presetExtension();
-		const auto searchString = PresetFolder + platform_string(_T("*.")) + extension;
-
-		std::wostringstream oss;
-		FileFinder it(searchString.c_str());
-		bool first = true;
-		for (; !it.done(); ++it)
-		{
-			if (!(*it).isFolder)
-			{
-				auto sourceFilename = PresetFolder + (*it).filename;
-				
-				if (first)
-				{
-					first = false;
-				}
-				else
-				{
-					oss << L',';
-				}
-
-				auto presetName = (*it).filename;
-
-				// chop off extension
-				auto p = presetName.find(extension);
-				if (p != std::string::npos)
-					presetName = presetName.substr(0, p - 1);
-
-				oss << toWstring(presetName);
-			}
-		}
-
-		return oss.str();
-	}
+	StringGuiPin programNameIn;
+	StringGuiPin programNameOut;
+	StringGuiPin CategoryIn;
+	StringGuiPin CategoryOut;
+	BoolGuiPin ModifiedIn;
+	BoolGuiPin ModifiedOut;
 
 	void onSetPreset()
 	{
+//		_RPT1(_CRT_WARN, "onSetPreset() %d\n", pinPreset.getValue());
 		if (pinPreset >= 0)
 		{
-			it_enum_list it(pinPresetNamesList);
-
-			if (it.FindIndex(pinPreset))
-			{
-				LoadNativePresetFile(it.CurrentItem()->text);
-			}
+			programIn = pinPreset;
 		}
-	}
-
-	void LoadNativePresetFile(std::wstring presetName)
-	{
-		//fs::path vst3PresetFolder(getVst3PresetsFolder());
-		//auto fn = vst3PresetFolder / presetName;
-		//fn.replace_extension(".vstpreset");
-
-		platform_string vst3PresetFolder = toPlatformString(getVst3PresetsFolder());
-		auto fn = vst3PresetFolder + toPlatformString(presetName) + toPlatformString(_T(".")) + presetExtension();
-
-//		getHost()->LoadPresetFile(fn.generic_u8string().c_str());
-		getHost()->LoadPresetFile(toString(fn).c_str());
 	}
 
 public:
@@ -110,7 +46,7 @@ public:
 		// Currently ignoring internal preset list.
 		// Might be good to enable it in Edit mode.
 		initializePin(programIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetprogramIn));
-		initializePin(programNamesListIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetprogramNamesListIn));
+		initializePin(programNamesListIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::updatePresetList));
 		initializePin(patchCommandIn);
 		initializePin(patchCommandListIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetPatchCommandListIn));
 
@@ -119,21 +55,34 @@ public:
 		initializePin(patchCommandOut, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetpatchCommandOut));
 		initializePin(patchCommandListOut);
 
-//		initializePin(programCategoriesListIn);
-		
+		initializePin(programCategoriesListIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::updatePresetList));
+
+		initializePin(programNameIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetprogramNameIn));
+		initializePin(programNameOut, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetprogramNameOut));
+
+		initializePin(CategoryIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetCategoryIn));
+		initializePin(CategoryOut, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetCategoryOut));
+
+		initializePin(ModifiedIn, static_cast<MpGuiBaseMemberPtr2>(&PatchBrowserGui::onSetModified));
+		initializePin(ModifiedOut);
+
 //		add pins for patch commands, refresh presets on import bank
 //			add factory support and bool to enable/disable it
 	}
 
-	void onSetprogramIn()
+	void onSetprogramNameIn()
 	{
-//		programOut = programIn;
+		programNameOut = programNameIn;
+	}
+	void onSetprogramNameOut()
+	{
+		programNameIn = programNameOut;
 	}
 
-	void onSetprogramNamesListIn()
+	void onSetprogramIn()
 	{
-//		programNamesList = programNamesListIn;
-		pinPresetNamesList = getNativePresetsList();
+//		_RPT1(_CRT_WARN, "onSetprogramIn() %d\n", programIn.getValue());
+		pinPreset = programIn;
 	}
 
 	void onSetpatchCommandOut()
@@ -143,7 +92,7 @@ public:
 		if (patchCommandOut == 4) // "Import Bank". magic number.
 		{
 			// Refresh disk preset list.
-			onSetprogramNamesListIn();
+			updatePresetList();
 		}
 
 		// Reset to Zero after executing command.
@@ -158,9 +107,116 @@ public:
 	{
 		patchCommandListOut = patchCommandListIn;
 	}
+
+	void onSetCategoryIn()
+	{
+		CategoryOut = CategoryIn;
+	}
+	void onSetModified()
+	{
+		ModifiedOut = ModifiedIn;
+	}
+	void onSetCategoryOut()
+	{
+		CategoryIn = CategoryOut;
+	}
+
+	void updatePresetList()
+	{
+		wstring presetNames;
+		wstring categoryNames;
+
+		presetNames = programNamesListIn;
+		categoryNames = programCategoriesListIn;
+
+		// category, name
+		std::vector< presetinfo > outputItems;
+
+		{
+			it_enum_list names(presetNames);
+			it_enum_list categories(categoryNames);
+			categories.First();
+			std::wstring category;
+			int index = 0;
+			for (names.First(); !names.IsDone(); names.Next())
+			{
+				if (!categories.IsDone())
+				{
+					category = categories.CurrentItem()->text;
+					categories.Next();
+				}
+				else
+				{
+					category = L"";
+				}
+
+				presetinfo pi{ index, category, names.CurrentItem()->text };
+				outputItems.push_back(pi);
+
+				++index;
+			}
+		}
+
+		std::sort(outputItems.begin(), outputItems.end(),
+			[=](const presetinfo& a, const presetinfo& b) -> bool
+			{
+				// Sort by category
+				if (a.category != b.category)
+				{
+					// blank category last
+					if (a.category.empty() != b.category.empty())
+						return a.category.empty() < b.category.empty();
+
+					return a.category < b.category;
+				}
+
+				// ..then by name
+				return a.name < b.name;
+			});
+
+		// Don't bother with sub-menus unless user has specified some actual categories.
+		bool usingCategories = !outputItems.empty() && !outputItems.front().category.empty();
+
+		std::wostringstream oss;
+		{
+			bool first = true;
+			bool inSubMenu = false;
+			std::wstring category{ L"pRetTyUnlikelyString#$%" };
+			for (auto& i : outputItems)
+			{
+				if (!first)
+				{
+					oss << L',';
+				}
+
+				if (usingCategories && category != i.category)
+				{
+					category = i.category;
+					if (inSubMenu)
+					{
+						oss << L"<<<<,";
+					}
+					std::wstring subMenu = category.empty() ? L"Other" : category;
+					oss << L">>>>" << subMenu << L",";
+
+					inSubMenu = true;
+				}
+
+				oss << i.name << L'=' << i.index;
+
+				first = false;
+			}
+		}
+//		_RPT1(_CRT_WARN, "%s\n", oss.str().c_str());
+
+		pinPresetNamesList = oss.str();
+
+		onSetprogramIn(); // In 32-bit GUI, we might have skipped this due to onSetprogramIn() being called first when 'inSynthEdit' was false.
+	}
 };
 
 namespace
 {
 	auto r = Register<PatchBrowserGui>::withId(L"SE Patch Browser");
 }
+SE_DECLARE_INIT_STATIC_FILE(PatchBrowser_Gui);

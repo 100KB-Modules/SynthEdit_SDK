@@ -20,7 +20,6 @@ bool Keyboard2Gui::getKeyState(int voice)
 	return pinGates.getValue(voice) > 0.f;
 }
 
-//int32_t Keyboard2Gui::paint(HDC hDC)
 int32_t KeyboardBase::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 {
 	return DrawKeyBoard::Render(drawingContext, getRect(), keyStates, baseKey_);
@@ -43,22 +42,17 @@ int32_t KeyboardBase::onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT po
 		return gmpi::MP_OK; // Indicate successful hit, so right-click menu can show.
 	}
 
-	setCapture();
+	const auto key = DrawKeyBoard::PointToKeyNum(point, getRect(), baseKey_);
 
-	int key = DrawKeyBoard::PointToKeyNum(point, getRect(), baseKey_);
-
-#ifdef _WIN32
-	if (GetKeyState(VK_CONTROL) < 0) // <ctrl> key toggles.
-#endif
+	if ((flags & gmpi_gui_api::GG_POINTER_KEY_CONTROL) != 0) // <ctrl> key toggles.
 	{
 		DoPlayNote(key, !keyStates[key]);
 	}
-#ifdef _WIN32
     else
 	{
 		DoPlayNote(key, true);
+		setCapture();
 	}
-#endif
 //	_RPT1(_CRT_WARN, "%d\n", key);
 
 	return gmpi::MP_HANDLED;
@@ -66,26 +60,25 @@ int32_t KeyboardBase::onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT po
 
 int32_t KeyboardBase::onPointerMove(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 {
-	// testing
-//	int t = PointToKeyNum(point);
-	//	swprintf(debugMessage, L"note %d", t);
-	//	invalidate();
-
 	if (!getCapture())
 		return gmpi::MP_OK;
 
-	int newMidiNote = DrawKeyBoard::PointToKeyNum(point, getRect(), baseKey_);
+	const auto key = DrawKeyBoard::PointToKeyNum(point, getRect(), baseKey_);
 
-	if (midiNote_ != newMidiNote)
+	if (!keyStates[key])
 	{
-		int oldMidiNote = midiNote_;
+		DoPlayNote(key, true);
 
-		DoPlayNote(newMidiNote, true);
-
-		// turn off current note
-		if (/*!toggleMode_ && */oldMidiNote > -1)
+		if ((flags & gmpi_gui_api::GG_POINTER_KEY_SHIFT) == 0)
 		{
-			DoPlayNote(oldMidiNote, false);
+			// turn off current note if any
+			for (int k = 0; k < 128; ++k)
+			{
+				if (keyStates[k] && k != key)
+				{
+					DoPlayNote(k, false);
+				}
+			}
 		}
 	}
 
@@ -101,21 +94,23 @@ int32_t KeyboardBase::onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT poin
 
 	if (!getCapture())
 		return gmpi::MP_OK;
-	/*
-	#ifndef VST_VERSION
-	if( !GetApp()->SynthRunning() ) // need to start sound
+
+	const auto key = DrawKeyBoard::PointToKeyNum(point, getRect(), baseKey_);
+
+	// <ctrl> key toggles. <shft> adds to selection.
+	if ((flags & gmpi_gui_api::GG_POINTER_KEY_SHIFT) == 0
+		&& key >= 0
+		) // <ctrl> key toggles.
 	{
-	GetApp()->OnRunPlay();
-	}
-	#endif
-	*/
-    
-#ifdef _WIN32
-    if (GetKeyState(VK_CONTROL) >= 0 && GetKeyState(VK_SHIFT) >= 0 && midiNote_ >= 0) // <ctrl> key toggles. <shft> adds to selection.
-#endif
-    {
-		DoPlayNote(midiNote_, false);
-		midiNote_ = -1;
+//		DoPlayNote(key, false);
+		// release any held notes
+		for (int k = 0; k < 128; ++k)
+		{
+			if (keyStates[k])
+			{
+				DoPlayNote(k, false);
+			}
+		}
 	}
 
 	releaseCapture();

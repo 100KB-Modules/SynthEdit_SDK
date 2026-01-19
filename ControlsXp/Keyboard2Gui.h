@@ -12,7 +12,6 @@ class KeyboardBase : public gmpi_gui::MpGuiGfxBase
 protected:
 	std::vector<bool> keyStates;
 
-	int midiNote_ = -1;
 	int baseKey_ = 36; // MIDI key num of leftmost key.
 
 public:
@@ -31,11 +30,11 @@ public:
 
 	void DoPlayNote(int p_note_num, bool note_on)
 	{
+		// Don't re-play note that was already toggled on
+		if (keyStates[p_note_num] == note_on)
+			return;
+
 		assert(p_note_num >= 0 && p_note_num < 128);
-		if (note_on)
-		{
-			midiNote_ = p_note_num;
-		}
 
 		keyStates[p_note_num] = note_on;
 		PlayNote(p_note_num, note_on);

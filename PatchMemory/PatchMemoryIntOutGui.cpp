@@ -19,7 +19,7 @@ PatchMemoryIntOutGui::PatchMemoryIntOutGui( IMpUnknown* host ) : MpGuiBase( host
 	//INIT_PINB( MenuItems);
 	//INIT_PINB( MenuSelection);
 
-	initializePin(8, pinAnimationPosition); // Skip non-existant pin 7.
+	initializePin(8, pinAnimationPosition); // Skip non-existant pin 7. Empty callback on purpose. It's an output only.
 	initializePin( pinMenuItems);
 	//initializePin(10, pinMenuSelection, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryIntOutGui::onMenuSelectionChanged ));
 	INIT_PINB( MenuSelection);

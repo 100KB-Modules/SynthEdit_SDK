@@ -6,16 +6,18 @@
 
 #include <map>
 #include <memory>
+#include <mutex>
 #include "../se_sdk3/TimerManager.h"
 #include "../se_sdk3/mp_gui.h"
 #include "../shared/FileWatcher.h"
-#include "../../IGuiHost2.h"
+#include "IGuiHost2.h"
 #include "../../interThreadQue.h"
 #include "../../SeAudioMaster.h"
 #include "../../mfc_emulation.h"
 #include "MpParameter.h"
 #include "../../modules/se_sdk3_hosting/ControllerHost.h"
 #include "../../my_msg_que_output_stream.h"
+#include "ProcessorStateManager.h"
 
 namespace SynthEdit2
 {
@@ -29,6 +31,8 @@ public:
 	std::vector< std::pair<int32_t, std::unique_ptr<ControllerHost> > > childPluginControllers;
 	IGuiHost2* patchManager;
 
+    virtual ~ControllerManager(){}
+    
 	virtual int32_t MP_STDCALL setParameter(int32_t parameterHandle, int32_t fieldId, int32_t voice, const void* data, int32_t size) override
 	{
 		int32_t moduleHandle = -1;
@@ -77,25 +81,24 @@ class MpController;
 
 class UndoManager
 {
-	//                      description   preset XML
-	std::vector< std::pair< std::string, std::string> > history;
+	std::vector< std::pair< std::string, std::unique_ptr<const DawPreset> >> history;
+	DawPreset AB_storage;
+
 	int undoPosition = -1;
 	bool AB_is_A = true;
-	std::string AB_storage;
 
 	int size()
 	{
 		return static_cast<int>(history.size());
 	}
 
+	void setPreset(MpController* controller, DawPreset const* preset);
+	DawPreset const* push(std::string description, std::unique_ptr<const DawPreset> preset);
+
 public:
 	bool enabled = {};
 
-	void initial(class MpController* controller);
-
-	void initialFromXml(MpController* controller, std::string xml);
-
-	void push(std::string description, const std::string& preset);
+	void initial(MpController* controller, std::unique_ptr<const DawPreset> preset);
 
 	void snapshot(class MpController* controller, std::string description);
 
@@ -108,21 +111,25 @@ public:
 	void debug();
 	bool canUndo();
 	bool canRedo();
+	bool isPresetModified();
 };
 
 class MpController : public IGuiHost2, public interThreadQueUser, public TimerClient
 {
+	friend class UndoManager;
+	friend class SubPresetManager;
+
 public:
 	// presets from factory.xmlpreset resource.
 	struct presetInfo
 	{
 		std::string name;
 		std::string category;
-		int index;			// Internal Factory presets only.
+		int index = -1;			// Internal Factory presets only.
 		std::wstring filename;	// External disk presets only.
-		std::size_t hash;
-		bool isFactory;
-		bool isSession = false; // is temporary preset to accomodate preset loaded from DAW session (but not an existing preset)
+		std::size_t hash = 0;
+		bool isFactory = false;
+		bool isSession = false; // is temporary preset to accommodate preset loaded from DAW session (but not an existing preset)
 	};
 
 protected:
@@ -137,36 +144,44 @@ private:
 	// Ignore-Program-Change support
 	static const int ignoreProgramChangeStartupTimeMs = 2000;
 	static const int startupTimerInit = ignoreProgramChangeStartupTimeMs / timerPeriodMs;
+	static const int dspWatchdogTimerInit = 1000 / timerPeriodMs; // 1 second
+	
 	int startupTimerCounter = startupTimerInit;
-	bool ignoreProgramChange = false;
+	int dspWatchdogCounter = dspWatchdogTimerInit;
 	bool presetsFolderChanged = false;
 
 protected:
+	std::map<int32_t, paramInfo> parametersInfo;		// for parsing xml presets
+	std::string full_reset_preset_name;
 	::UndoManager undoManager;
+
     bool isInitialized = {};
 
 	std::vector< std::unique_ptr<MpParameter> > parameters_;
 	std::map< std::pair<int, int>, int > moduleParameterIndex;		// Module Handle/ParamID to Param Handle.
-	std::map< int, MpParameter* > ParameterHandleIndex;				// Param Handle to Parameter*.
+	std::unordered_map< int, MpParameter* > ParameterHandleIndex;	// Param Handle to Parameter*.
 	std::vector<gmpi::IMpParameterObserver*> m_guis2;
 	SynthEdit2::IPresenter* presenter_ = nullptr;
 
 	GmpiGui::FileDialog nativeFileDialog;
 
     interThreadQue message_que_dsp_to_ui;
-	bool hasInternalPresets = false; // VST2 has internal preset. VST3 does not.
 	bool isSemControllersInitialised = false;
 
 	// see also VST3Controller.programNames
 	std::vector< presetInfo > presets;
-	std::string session_preset_xml;
+	DawPreset session_preset;
 
 	GmpiGui::OkCancelDialog okCancelDialog;
 
 	void OnFileDialogComplete(int mode, int32_t result);
 	virtual void OnStartupTimerExpired();
 
+	bool ignoreProgramChangeActive() const;
+	int32_t getCurrentPresetIndex();
+
 public:
+
 	MpController() :
 		message_que_dsp_to_ui(SeAudioMaster::UI_MESSAGE_QUE_SIZE2)
 	{
@@ -177,11 +192,14 @@ public:
     ~MpController();
 
 	void ScanPresets();
-	void setPresetFromDaw(const std::string& xml, bool updateProcessor);
+	virtual void setPreset(DawPreset const* preset);
+	void syncPresetControls(DawPreset const* preset);
+
 	void SavePreset(int32_t presetIndex);
 	void SavePresetAs(const std::string& presetName);
 	void DeletePreset(int presetIndex);
 	void UpdatePresetBrowser();
+	std::pair<bool, bool> CategorisePresetName(const std::string& name);
 
 	void Initialize();
 
@@ -198,6 +216,10 @@ public:
 	virtual void ParamGrabbed(MpParameter_native* param) = 0;
 
 	// Presets
+	// asking platform-specific controller to set preset on both controller and processor.
+	// the preset originates from the plugins preset browser, not from the DAW.
+	virtual void setPresetXmlFromSelf(const std::string& xml) = 0;
+	virtual void setPresetFromSelf(DawPreset const* preset) = 0;
 	virtual std::string loadNativePreset(std::wstring sourceFilename) = 0;
 	virtual void saveNativePreset(const char* filename, const std::string& presetName, const std::string& xml) = 0;
 	virtual std::wstring getNativePresetExtension() = 0;
@@ -207,18 +229,21 @@ public:
 	}
 	presetInfo getPresetInfo(int index) // return a copy on purpose so we can rescan presets from inside PresetMenu.callbackOnDeleteClicked lambda
 	{
+		if (index < 0 || index >= presets.size())
+			return { {}, {}, -1, {}, 0, false, true };
+
 		return presets[index];
 	}
 	bool isPresetModified();
-	void FileToString(const platform_string& path, std::string& buffer);
 
 	MpController::presetInfo parsePreset(const std::wstring& filename, const std::string& xml);
 	std::vector< MpController::presetInfo > scanNativePresets();
 	virtual std::vector< MpController::presetInfo > scanFactoryPresets() = 0;
-	virtual void loadFactoryPreset(int index, bool fromDaw) = 0;
+//	virtual void loadFactoryPreset(int index, bool fromDaw) = 0;
+	virtual std::string getFactoryPresetXml(std::string filename) = 0;
 	std::vector<MpController::presetInfo> scanPresetFolder(platform_string PresetFolder, platform_string extension);
 
-	void ParamToDsp(MpParameter* param, int32_t voice = 0);
+	virtual void ParamToDsp(MpParameter* param, int32_t voice = 0);
 //	void HostControlToDsp(MpParameter* param, int32_t voice = 0);
 	void SerialiseParameterValueToDsp(my_msg_que_output_stream& stream, MpParameter* param, int32_t voice = 0);
 	void UpdateProgramCategoriesHc(MpParameter * param);
@@ -253,15 +278,15 @@ public:
 	MpParameter* getHostParameter(int32_t hostControl);
 
 	void ImportPresetXml(const char* filename, int presetIndex = -1);
-	std::string getPresetXml(std::string presetNameOverride = {});
-	void setPreset(class TiXmlNode* parentXml, bool updateProcessor, int preset);
-	void setPreset(const std::string& xml, bool updateProcessor = true, int preset = 0);
+	std::unique_ptr<const DawPreset> getPreset(std::string presetNameOverride = {});
 	void ExportPresetXml(const char* filename, std::string presetNameOverride = {});
 	void ImportBankXml(const char * filename);
 	void setModified(bool presetIsModified);
 	void ExportBankXml(const char * filename);
 
 	void setParameterValue(RawView value, int32_t parameterHandle, gmpi::FieldType moduleFieldId = gmpi::MP_FT_VALUE, int32_t voice = 0) override;
+	void undoTransanctionStart() override;
+	void undoTransanctionEnd() override;
 	gmpi_gui::IMpGraphicsHost * getGraphicsHost();
 	virtual int32_t resolveFilename(const wchar_t* shortFilename, int32_t maxChars, wchar_t* returnFullFilename) override;
 
@@ -306,9 +331,22 @@ public:
 		return &message_que_dsp_to_ui;
 	}
 
-	virtual void ResetProcessor() {}
+	virtual void ResetProcessor() {} // not used?
+	void ResetProcessor2();
 	virtual void OnStartPresetChange() {}
 	virtual void OnEndPresetChange();
 	virtual void OnLatencyChanged() {}
 	virtual MpParameter_native* makeNativeParameter(int ParameterTag, bool isInverted = false) = 0;
+};
+
+struct IPresetsModel
+{
+	virtual int getPresetCount() = 0;
+	virtual int getPresetIndex() = 0; // index according to controller (not nesc order displayed in combo)
+	virtual void setPresetIndex(int) = 0;
+	virtual MpController::presetInfo getPresetInfo(int index) = 0;
+	virtual std::pair<bool, bool> CategorisePresetName(const std::string& name) = 0;
+	virtual void SavePresetAs(const std::string& presetName) = 0;
+	virtual void DeletePreset(int presetIndex) = 0;
+	virtual bool isPresetModified() = 0;
 };

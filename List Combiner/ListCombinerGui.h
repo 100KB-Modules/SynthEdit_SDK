@@ -1,16 +1,15 @@
 #ifndef LISTCOMBINERGUI_H_INCLUDED
 #define LISTCOMBINERGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 
 class ListCombinerGui : public MpGuiBase
 {
 public:
 	ListCombinerGui( IMpUnknown* host );
 
-private:
  	void onSetItemListIn();
- 	void onSetChoiceOut();
+ 	virtual void onSetChoiceOut();
 
 	IntGuiPin choiceA;
  	StringGuiPin itemListA;
@@ -20,6 +19,13 @@ private:
  	StringGuiPin itemListOut;
  	BoolGuiPin AMomentary;
  	BoolGuiPin BMomentary;
+};
+
+class ListCombinerGui2 : public ListCombinerGui
+{
+public:
+    ListCombinerGui2(IMpUnknown* host);
+    void onSetChoiceOut() override;
 };
 
 #endif

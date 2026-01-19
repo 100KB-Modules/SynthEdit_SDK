@@ -9,7 +9,7 @@ PatchMemoryBlob::PatchMemoryBlob(IMpUnknown* host) : MpBase(host)
 	initializePin( 1, pinValueOut );
 }
 
-void PatchMemoryBlob::onSetPins(void)  // one or more pins_ updated.  Check pin update flags to determin which ones.
+void PatchMemoryBlob::onSetPins()  // one or more pins_ updated.  Check pin update flags to determin which ones.
 {
 	if( pinValueIn.isUpdated() )
 	{

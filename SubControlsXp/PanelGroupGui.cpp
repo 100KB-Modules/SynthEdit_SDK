@@ -9,6 +9,7 @@ using namespace GmpiDrawing;
 using namespace GmpiDrawing_API;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, PanelGroupGui, L"SE Panel Group" );
+SE_DECLARE_INIT_STATIC_FILE(PanelGroup_Gui)
 
 PanelGroupGui::PanelGroupGui() :
 	bitmapMetadata_(nullptr)
@@ -36,9 +37,33 @@ int32_t PanelGroupGui::initialize()
 	auto r = gmpi_gui::MpGuiGfxBase::initialize(); // ensure all pins initialised (so widgets are built).
 
 	bitmap_ = GetImage("lines", &bitmapMetadata_);
-	textFormat_ = GetTextFormat("panel_group");
-	textData = GetFontMetatdata("panel_group");
+
+	const char* fontCategory = "panel_group";
+	textFormat_ = GetTextFormat(fontCategory);
+	textData = GetFontMetatdata(fontCategory);
+
 	onSetText();
+
+	if(textData && textData->verticalSnapBackwardCompatibilityMode)
+	{
+		text_y = textData->getLegacyVerticalOffset() -2;
+	}
+	else
+	{
+		// Center text vertically.
+		if(bitmap_ && bitmapMetadata_ && textFormat_)
+		{
+			const auto size_source = bitmap_.GetSize();
+			const auto bitmap_size = bitmapMetadata_->frameSize;
+			const int width = size_source.width - bitmap_size.width;
+
+			float top = width / 2 + floorf(text_size.height / 4); // see render for all this crap.
+			top += floorf(text_size.height / 4);
+
+			auto metrics = textFormat_.GetFontMetrics();
+			text_y = top + (width / 2) - (metrics.bodyHeight() * 0.5);
+		}
+	}
 
 	return r;
 }
@@ -96,24 +121,11 @@ int32_t PanelGroupGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContex
 
 	// Draw title.
 	const bool draw_title = !pinText.getValue().empty();
-	if (draw_title)
-	{
-		Point text_pos(left + corner_cx + end_length * 2, -2);
-		auto brush = g.CreateSolidColorBrush(textData->getColor());
-		int start_x = text_pos.x + text_size.width + end_length;
-
-		// rounded end right of text
-		int rnd_x = (std::min)(right - corner_cx - end_length, start_x);
-		start_x += end_length;
-
-		text_pos.y += textData->getLegacyVerticalOffset();
-		g.DrawTextU(title_utf8, textFormat_, Rect(text_pos.x, text_pos.y, text_pos.x + text_size.width, text_pos.y + text_size.height), brush);
-	}
 
 #if 1 // draw from "exploded" skin file.
 
 	const char* customImageId = "PanelGroupGui::lines-exploded.bpm";
-	auto fixedBitmap = GetCustomImage(customImageId);
+	auto fixedBitmap = GetCustomImage(g.GetFactory().Get(), customImageId);
 
 	const int padding = 2;
 	if (fixedBitmap.isNull())
@@ -316,7 +328,7 @@ int32_t PanelGroupGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContex
 		// rounded end on top left curve
 		dc.DrawBitmap(fixedBitmap, PointL(left + corner_cx, top), rRightEnd, mode);
 
-		Point text_pos(left + corner_cx + end_length * 2, -2);
+		Point text_pos(left + corner_cx + end_length * 2, text_y);
 		auto brush = dc.CreateSolidColorBrush(textData->getColor());
 		start_x = text_pos.x + text_size.width + end_length;
 
@@ -325,7 +337,6 @@ int32_t PanelGroupGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContex
 		dc.DrawBitmap(fixedBitmap, PointL(rnd_x, top), rleftEnd, mode);
 		start_x += end_length;
 
-		text_pos.y += textData->getLegacyVerticalOffset();
 		dc.DrawTextU(title_utf8, textFormat_, Rect(text_pos.x, text_pos.y, text_pos.x + text_size.width, text_pos.y + text_size.height), brush);
 	}
 

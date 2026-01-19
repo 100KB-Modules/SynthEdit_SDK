@@ -2,11 +2,17 @@
 #define CLASSICCONTROLGUIBASE_H_INCLUDED
 
 #include "../se_sdk3/Drawing_API.h"
-#include "WidgetHost.h"
+#include "../sharedLegacyWidgets/WidgetHost.h"
 
 class ClassicControlGuiBase : public WidgetHost
 {
 public:
+
+	int32_t MP_STDCALL setHost(gmpi::IMpUnknown* host) override
+	{
+		return WidgetHost::setHost(host);
+	}
+
 	virtual int32_t MP_STDCALL initialize() override;
 	/*
 	// IMpGraphics overrides.
@@ -22,11 +28,16 @@ public:
 		return gmpi::MP_OK;
 	}
 
+	bool useBackwardCompatibleArrangement();
+
 protected:
 	void onSetTitle();
 
 	StringGuiPin pinHint;
 	StringGuiPin pinTitle;
+
+private:
+	int backwardCompatibleVerticalArrange = -1;
 };
 
 #endif

@@ -1,4 +1,4 @@
-#include ".\ImpulseResponse.h"
+#include "./ImpulseResponse.h"
 #define _USE_MATH_DEFINES
 #include <math.h>
 
@@ -6,6 +6,7 @@ const int LOG2_MAXFFTSIZE = 15;
 const int MAXFFTSIZE = 1 << LOG2_MAXFFTSIZE;
 #define time_delay FFT_SIZE
 
+SE_DECLARE_INIT_STATIC_FILE(ImpulseResponse);
 
 REGISTER_PLUGIN ( ImpulseResponse, L"SE Impulse Response" );
 
@@ -29,30 +30,8 @@ ImpulseResponse::ImpulseResponse( IMpUnknown* host ) : MpBase( host )
 		float t = sinf( i * c );
 		window[i] = t * t;
 	}
-	
-	memset(results, 0, sizeof(results));
-	// todo? SetFlag(UGF_POLYPHONIC_AGREGATOR|UGF_VOICE_MON_IGNORE);
 }
 
-/*
-int ImpulseResponse::Open()
-{
-	ug_base::Open();
-	//	input_ptr = GetPlug(0)->Get SamplePtr();
-	m_idx = 0;
-	SET_PROCESS( &ImpulseResponse::sub_process );
-	RUN_AT(SampleClock() + time_delay, &ImpulseResponse::print_result );
-	// send sample-rate
-	// my_msg_que_output_stream strm(AudioMaster()->Application()->MessageQueToGui(), Handle(), "srte" );
-	my_output_stream& strm = AudioMaster()->Application()->MessageQueToGui();
-	strm << Handle();
-	strm << id_to_long("srte");
-	strm << (int) sizeof(int); // message length.
-	strm << (int) getSampleRate();
-	//strm.Send();
-	return 0;
-}
-*/
 // do nothing while UI updates
 void ImpulseResponse::subProcessIdle(int bufferOffset, int sampleFrames)
 {
@@ -82,7 +61,7 @@ void ImpulseResponse::subProcess( int bufferOffset, int sampleFrames )
 	// get pointers to in/output buffers.
 	float* signal	= bufferOffset + pinSignalin.getBuffer();
 
-	int count = min( sampleFrames, FFT_SIZE - m_idx );
+    int count = (std::min)( sampleFrames, FFT_SIZE - m_idx );
 
 	assert( m_idx >= 0 && m_idx < FFT_SIZE );
 
@@ -98,7 +77,7 @@ void ImpulseResponse::subProcess( int bufferOffset, int sampleFrames )
 	}
 }
 
-void ImpulseResponse::onSetPins(void)
+void ImpulseResponse::onSetPins()
 {
 	// Set processing method.
 	SET_PROCESS(&ImpulseResponse::subProcess);
@@ -117,36 +96,25 @@ void ImpulseResponse::printResult()
 		pinResults.sendPinUpdate( 0 );
 		return;
 	}
-/*
-	// apply window
-	for(int i=0; i < FFT_SIZE; i++)
-	{
-		realArray[i] = window[i] * buffer[i];
-	}
-*/
-	// no window (square window).
-	for(int i=0; i < FFT_SIZE; i++)
-	{
-		realArray[i] = buffer[i];
-	}
 
+	// no window (square window).
 	// Calculate FFT.
-	realft( &(realArray[-1]), FFT_SIZE, 1 );
+	realft( &(buffer[-1]), FFT_SIZE, 1 );
 
 	// calc power. Get magnitude of real and imaginary vectors.
-	float nyquist = realArray[1]; // DC & nyquist combined into 1st 2 entries
+	float nyquist = buffer[1]; // DC & nyquist combined into 1st 2 entries
 
 	//	realArray[1] = 0.0f;
 	for(int i=1; i < FFT_SIZE/2; i++)
 	{
-		float power = realArray[2*i] * realArray[2*i] + realArray[2*i+1] * realArray[2*i+1];
+		float power = buffer[2*i] * buffer[2*i] + buffer[2*i+1] * buffer[2*i+1];
 		// square root
 		power = sqrtf(power);
-		realArray[i] = power;
+		buffer[i] = power;
 	}
 
-	realArray[0] = fabs(realArray[0]) / 2.f; // DC component is divided by 2
-	realArray[FFT_SIZE/2] = fabs(nyquist);
+	buffer[0] = fabs(buffer[0]) / 2.f; // DC component is divided by 2
+	buffer[FFT_SIZE/2] = fabs(nyquist);
 	// convert results to log scale
 	float octave_step = (float) SP_OCTAVES / (float) m_spectrum_size;
 	float octave_center = 0.f;
@@ -157,53 +125,9 @@ void ImpulseResponse::printResult()
 	constexpr float db_scale_const = 105.0f / (float) FFT_SIZE;
 	float peak = - 100;
 	float tot = 0;
-/*
-	for( int i = 0 ; i < m_spectrum_size; i++ )
-	{
-		// square root
-		float power = log_results[i];
-
-		if( power > peak )
-		{
-			m = i;
-		}
-
-		peak = max(peak,power);
-		tot += power;
-		power = max( power, 0.00000000001f ); // prevent overflow in log()
-		// convert to db
-		float db = 10.f * log10f( power * db_scale_const );
-		log_results[i] = db;
-	}
-*/
-	// LINEAR SCALE
-	// Calculate power at each point and store in realArray. We only
-	// care about the first half of the sample values as all of the
-	// input data was real and therefore only the first half of the
-	// results are "independent".
-/*
-	const float db_scale = 8.6f / (float)FFT_SIZE; // experimentally determined
-	peak = - 100;
-	int i;
-	for(i=0; i < FFT_SIZE; i++)
-	{
-		float power = realArray[i];// * realArray[i] + imagArray[i] * imagArray[i];
-		peak = max(peak,power);
-		//		power = sqrt(power);
-		// square root
-		power = max( power, 0.00000000001f ); // prevent overflow in log()
-		// convert to db
-		realArray[i] = 10.0f * log10f( power * db_scale );
-	}
-*/
-	// copy to results.
-	for( int i = 0; i < FFT_SIZE/2; i++)
-	{
-		results[i] = realArray[i];
-	}
 
 	// Send to GUI.
-	pinResults.setValueRaw( sizeof(results[0]) * FFT_SIZE/2, &results );
+	pinResults.setValueRaw( sizeof(buffer[0]) * FFT_SIZE/2, &buffer);
 	pinResults.sendPinUpdate( 0 );
 }
 

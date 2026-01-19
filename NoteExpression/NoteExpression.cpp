@@ -1,8 +1,64 @@
 #include "./NoteExpression.h"
-//#include "NoteExpression.xml.h"
+
+using namespace gmpi;
+
+SE_DECLARE_INIT_STATIC_FILE(NoteExpression);
+
+// TODO. might need to copy MidiToCv2, in that the outputs 'jump' on a new note, yet glide otherwise. Would need audio outputs.
+
+class NoteExpression2 final : public MpBase2
+{
+	FloatInPin pinVolume;
+	FloatInPin pinPan;
+	FloatInPin pinBrightness;
+	FloatInPin pinPressure;
+	FloatOutPin pinVolumeOut;
+	FloatOutPin pinPanOut;
+	FloatOutPin pinBrightnessOut;
+	FloatOutPin pinPressureOut;
+
+public:
+	NoteExpression2()
+	{
+		initializePin( pinVolume );
+		initializePin( pinPan );
+		initializePin( pinBrightness );
+		initializePin( pinPressure );
+		initializePin( pinVolumeOut );
+		initializePin( pinPanOut );
+		initializePin( pinBrightnessOut );
+		initializePin( pinPressureOut );
+	}
+
+	void onSetPins() override
+	{
+		// Check which pins are updated.
+		if( pinVolume.isUpdated() )
+		{
+			pinVolumeOut = pinVolume;
+		}
+		if( pinPan.isUpdated() )
+		{
+			pinPanOut = pinPan;
+		}
+		if( pinBrightness.isUpdated() )
+		{
+			pinBrightnessOut = pinBrightness;
+		}
+		if( pinPressure.isUpdated() )
+		{
+			pinPressureOut = pinPressure;
+		}
+	}
+};
+
+namespace
+{
+	auto r = Register<NoteExpression2>::withId(L"SE Note Expression2");
+}
+
 
 REGISTER_PLUGIN2 ( NoteExpression, L"SE Note Expression" );
-//REGISTER_XML(NOTEEXPRESSION_XML);
 
 NoteExpression::NoteExpression()
 {
@@ -38,13 +94,14 @@ void NoteExpression::subProcess( int sampleFrames )
 	}
 }
 
-void NoteExpression::onSetPins(void)
+void NoteExpression::onSetPins()
 {
 	for (int i = 0; i < 8; ++i)
 	{
 		if (inPins[i].isUpdated())
 		{
 			outPins[i] = 0.1f * inPins[i];
+//			_RPTN(0, "                                 NoteExpression: %d %f\n", i, inPins[i].getValue());
 		}
 	}
 

@@ -15,6 +15,7 @@ using namespace GmpiDrawing;
 using namespace JmUnicodeConversions;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, SliderGui, L"SE Slider");
+SE_DECLARE_INIT_STATIC_FILE(Slider_Gui);
 
 int32_t SliderGui::OnRender(GmpiDrawing_API::IMpDeviceContext* drawingContext)
 {
@@ -106,7 +107,7 @@ void SliderGui::onSetAppearance()
 	getGuiHost()->invalidateMeasure();
 }
 
-std::wstring SliderFloatToString(float val, int p_decimal_places = -1) // better because it removes trailing zeros. -1 for auto decimal places
+std::wstring SliderGui::SliderFloatToString(float val, int p_decimal_places) // better because it removes trailing zeros. -1 for auto decimal places
 {
 	bool auto_decimal = p_decimal_places < 0; // remember auto (as decimal places is modified)
 	std::wostringstream oss;
@@ -159,7 +160,6 @@ std::wstring SliderFloatToString(float val, int p_decimal_places = -1) // better
 
 		if( i == 0 ) // nothing but zeros (or dot).
 		{
-//			s = Right(s, s.size() - 1);
 			s = s.substr(1);
 		}
 	}
@@ -326,6 +326,20 @@ int32_t SliderGui::onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point)
 	return gmpi::MP_OK;
 }
 
+int32_t SliderGui::onMouseWheel(int32_t flags, int32_t delta, GmpiDrawing_API::MP1_POINT point)
+{
+	// ignore horizontal scrolling
+	if (0 != (flags & gmpi_gui_api::GG_POINTER_KEY_SHIFT))
+		return gmpi::MP_UNHANDLED;
+
+	const float scale = (flags & gmpi_gui_api::GG_POINTER_KEY_CONTROL) ? 1.0f / 12000.0f : 1.0f / 1200.0f;
+	const float newval = bitmap.GetNormalised() + delta * scale;
+	bitmap.SetNormalised(std::clamp(newval, 0.0f, 1.0f));
+	UpdateValuePinFromBitmap();
+
+	return gmpi::MP_OK;
+}
+
 int32_t SliderGui::populateContextMenu(float x, float y, gmpi::IMpUnknown* contextMenuItemsSink)
 {
 	// TODO: hit-test.
@@ -337,7 +351,25 @@ int32_t SliderGui::populateContextMenu(float x, float y, gmpi::IMpUnknown* conte
 
 	for (itr.First(); !itr.IsDone(); ++itr)
 	{
-		sink->AddItem(WStringToUtf8(itr.CurrentItem()->text).c_str(), itr.CurrentItem()->value);
+		int32_t flags = 0;
+
+		// Special commands (sub-menus)
+		switch (itr.CurrentItem()->getType())
+		{
+			case enum_entry_type::Separator:
+			case enum_entry_type::SubMenu:
+				flags |= gmpi_gui::MP_PLATFORM_MENU_SEPARATOR;
+				break;
+
+			case enum_entry_type::SubMenuEnd:
+			case enum_entry_type::Break:
+				continue;
+
+			default:
+				break;
+		}
+
+		sink->AddItem(WStringToUtf8(itr.CurrentItem()->text).c_str(), itr.CurrentItem()->value, flags);
 	}
 
 	return gmpi::MP_OK;
@@ -438,13 +470,24 @@ int32_t SliderGui::setHost(gmpi::IMpUnknown* host)
 	edit.setHost(host);
 	headerWidget.setHost(host);
 
-	return MpGuiGfxBase::setHost(host);
+	const auto r =  MpGuiGfxBase::setHost(host);
+
+	// In SE 1.1 List-Entry had centered headings.
+	// In 1.3 everything got left-justified by mistake.Rectify this, but only if (1.4) backward-compatibility switched off.
+	{
+		FontMetadata* fontData{};
+		FontCache::instance()->GetTextFormat(getHost(), getGuiHost(), "control_label", &fontData);
+
+		backwardCompatibleVerticalArrange = fontData->verticalSnapBackwardCompatibilityMode;
+	}
+
+	return r;
 }
 
 int32_t SliderGui::initialize()
 {
-	//	edit.setHost(getHost());
-	edit.Init("control_edit");
+	edit.SetMinVisableChars(5); // from Ctl_Slider::BuildWidget2()
+	edit.Init("control_edit", true);
 	edit.OnChangedEvent = [this](const char* newvalue) -> void
 		{
 			try
@@ -457,9 +500,9 @@ int32_t SliderGui::initialize()
 
 			onSetValueIn();
 		};
-	edit.SetMinVisableChars(5); // from Ctl_Slider::BuildWidget2()
 
-	headerWidget.Init("control_label");
+	const bool centerHeading  = !backwardCompatibleVerticalArrange;
+	headerWidget.Init("control_label", centerHeading);
 	headerWidget.SetText(pinTitle);
 
 	return gmpi_gui::MpGuiGfxBase::initialize();

@@ -215,10 +215,10 @@ struct MpEvent
 	int32_t timeDelta;	// Relative to block.
 	int32_t eventType;	// See MpEventType enumeration.
 	int32_t parm1;		// Pin index if needed.
-	int32_t parm2;		// Sizeof additional data. >4 implies extraData points to value.
-	int32_t parm3;		// Pin value (if 4 bytes or less).
-	int32_t parm4;		// Voice ID.
-	char* extraData;	// Additional data.
+	int32_t parm2;		// Sizeof pin data.
+	int32_t parm3;		// Pin value (if 1-4 bytes).
+	int32_t parm4;		// Pin value additional (if 5-8 bytes).
+	char* extraData;	// Additional pin data, if it's larger than 8 bytes.
 	MpEvent* next;		// Next event in list.
 };
 
@@ -718,10 +718,11 @@ enum FieldType {
 	, MP_FT_IGNORE_PROGRAM_CHANGE
 	, MP_FT_PRIVATE
 	, MP_FT_AUTOMATION				// int
-	, MP_FT_AUTOMATION_SYSEX			// STRING
+	, MP_FT_AUTOMATION_SYSEX		// STRING
 	, MP_FT_DEFAULT					// same type as parameter
-	, MP_FT_GRAB						// (mouse down) bool
+	, MP_FT_GRAB					// (mouse down) bool
 	, MP_FT_NORMALIZED				// float
+	, MP_FT_STATEFUL				// bool
 };
 
 class IMpParameterObserver : public IMpUnknown
@@ -1025,7 +1026,7 @@ namespace gmpi_gui_api
 	class IMpGraphics2;
 }
 
-namespace sesdk // was 'gmpi'
+namespace gmpi
 {
 template< class moduleClass >
 class Register
@@ -1087,8 +1088,6 @@ public:
 
 } // namespace
 
-using namespace sesdk; // allow legacy code to omit the namespace, while still allowing a way to resolve conflicts with (real) GMPI
-
 // Helper for old hosts calling new-style plugins. Deprecated, use IMpLegacyInitialization instead.
 class IoldSchoolInitialisation
 {
@@ -1128,7 +1127,8 @@ struct MpBlob
 		setValueRaw((size_t)size, data);
 	}
 	const MpBlob &operator=( const MpBlob& other );
-	bool operator==( const MpBlob& other ) const;
+	bool operator==(const MpBlob& other) const;
+	bool operator!=(const MpBlob& other) const;
 	bool compare( char* data, int size );
 	bool operator!=( const MpBlob& other );
 	int32_t getSize() const;

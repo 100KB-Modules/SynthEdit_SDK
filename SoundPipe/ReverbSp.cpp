@@ -35,7 +35,7 @@ public:
 			sp_revsc_destroy(&reverbInfo);
 	}
 
-	int32_t MP_STDCALL open()
+	int32_t MP_STDCALL open() override
 	{
 		sp_revsc_create(&reverbInfo);
 		sp_revsc_init(&soundPipeData, reverbInfo);
@@ -82,7 +82,7 @@ public:
 		}
 	}
 
-	virtual void onSetPins(void) override
+	virtual void onSetPins() override
 	{
 		if(pinFeedBack.isUpdated() || pinLowPass.isUpdated())
 		{

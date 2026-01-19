@@ -145,7 +145,6 @@ namespace gmpi
 			writeFactory(nullptr)
 			, pIWICFactory(nullptr)
 			, m_pDirect2dFactory(nullptr)
-			, DX_support_sRGB(true)
 		{
 		}
 
@@ -799,6 +798,7 @@ return gmpi::MP_FAIL; // creating WIC from D2DBitmap not implemented fully.
 				return gmpi::MP_FAIL;
 			}
 */
+
 			gmpi_sdk::mp_shared_ptr<gmpi::IMpUnknown> b2;
 			b2.Attach(new bitmapPixels(nativeBitmap_, diBitmap_, true, flags));
 
@@ -848,7 +848,7 @@ return gmpi::MP_FAIL; // creating WIC from D2DBitmap not implemented fully.
 					// Convert to D2D format and cache.
 					auto hr = nativeContext_->CreateBitmapFromWicBitmap(
 						diBitmap_,
-						&props, //NULL,
+						&props,
 						&nativeBitmap_
 					);
 
@@ -997,8 +997,18 @@ return gmpi::MP_FAIL; // creating WIC from D2DBitmap not implemented fully.
 		{
 			*solidColorBrush = nullptr;
 
+//			HRESULT hr = context_->CreateSolidColorBrush(*(D2D1_COLOR_F*)color, &b);
+
+			const D2D1_COLOR_F c
+			{
+				color->r,
+				color->g,
+				color->b,
+				color->a
+			};
+
 			ID2D1SolidColorBrush* b = nullptr;
-			HRESULT hr = context_->CreateSolidColorBrush(*(D2D1_COLOR_F*)color, &b);
+			HRESULT hr = context_->CreateSolidColorBrush(c, &b);
 
 			if (hr == 0)
 			{
@@ -1026,17 +1036,29 @@ return gmpi::MP_FAIL; // creating WIC from D2DBitmap not implemented fully.
 			HRESULT hr = 0;
 
 #if 1
+			std::vector<D2D1_GRADIENT_STOP> stops(gradientStopsCount);
+			for (uint32_t i = 0; i < gradientStopsCount; ++i)
+			{
+				stops[i].color = D2D1::ColorF(
+					gradientStops[i].color.r,
+					gradientStops[i].color.g,
+					gradientStops[i].color.b,
+					gradientStops[i].color.a
+				);
+				stops[i].position = gradientStops[i].position;
+			}
 			{
 				// New way. Gamma-correct gradients without banding. White->Black mid color seems wrong (too light).
 				// requires ID2D1DeviceContext, not merely ID2D1RenderTarget
 				ID2D1GradientStopCollection1* native2 = nullptr;
 
 				hr = context_->CreateGradientStopCollection(
-					(D2D1_GRADIENT_STOP*)gradientStops,
+					stops.data(), // (D2D1_GRADIENT_STOP*)gradientStops,
 					gradientStopsCount,
 					D2D1_COLOR_SPACE_SRGB,
 					D2D1_COLOR_SPACE_SRGB,
-					D2D1_BUFFER_PRECISION_8BPC_UNORM_SRGB, // Buffer precision. D2D1_BUFFER_PRECISION_16BPC_FLOAT seems the same
+					//D2D1_BUFFER_PRECISION_8BPC_UNORM_SRGB, // Buffer precision. fails in HDR
+					D2D1_BUFFER_PRECISION_16BPC_FLOAT, // the same in normal, correct in HDR
 					D2D1_EXTEND_MODE_CLAMP,
 					D2D1_COLOR_INTERPOLATION_MODE_STRAIGHT,
 					&native2);

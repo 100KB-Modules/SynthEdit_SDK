@@ -29,23 +29,25 @@ void MidiLogger::subProcess( int bufferOffset, int sampleFrames )
 	sampleClock += sampleFrames;
 }
 
-void MidiLogger::onSetPins(void)
+void MidiLogger::onSetPins()
 {
 	// Check which pins are updated.
 	if( pinFileName.isUpdated() )
 	{
-		wchar_t fullFilename[500];
-		getHost()->resolveFilename( pinFileName.getValue().c_str(), sizeof(fullFilename)/sizeof(fullFilename[0]), fullFilename );
+		const auto fullFilename = host.resolveFilename_old(pinFileName);
 
 		if( outputStream != 0 )
 		{
 			fclose( outputStream );
 		}
-		outputStream = _wfopen( fullFilename, L"wt");
-
+#ifdef _WIN32
+		outputStream = _wfopen( fullFilename.c_str(), L"wt");
+#else
+        outputStream = fopen( JmUnicodeConversions::WStringToUtf8(fullFilename).c_str(), "wt");
+#endif
 		if( outputStream == 0 )
 		{
-#ifndef SE_TARGET_WAVES
+#ifdef _WIN32
 			MessageBoxA(0,"MidiLogger: Failed to open output file.", "debug msg", MB_OK );
 #endif
 			return;

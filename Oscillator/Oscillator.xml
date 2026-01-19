@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <PluginList>
-  <Plugin id="My Oscillator" name="Oscillator" category="Experimental">
+  <Plugin id="SE Oscillator" name="Oscillator" category="Debug">
     <Audio>
       <Pin name="Pitch" datatype="float" rate="audio" default="0.5" metadata="100, 0, 10, 0" />
       <Pin name="Pulse Width" datatype="float" rate="audio" default="0.5" />

@@ -1,7 +1,7 @@
 #include "./FloatLimiterGui.h"
 
-
 REGISTER_GUI_PLUGIN( FloatLimiterGui, L"SE Float Limiter" );
+SE_DECLARE_INIT_STATIC_FILE(FloatLimiter_Gui);
 
 FloatLimiterGui::FloatLimiterGui( IMpUnknown* host ) : MpGuiBase(host)
 {

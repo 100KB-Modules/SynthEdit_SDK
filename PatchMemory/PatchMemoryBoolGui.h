@@ -22,6 +22,7 @@ public:
 	StringGuiPin	pinMenuItems;
 	IntGuiPin		pinMenuSelection;
 	BoolGuiPin		pinMouseDown;
+	bool inhibitFeedback = {};
 
 private:
 	void onValueInChanged();

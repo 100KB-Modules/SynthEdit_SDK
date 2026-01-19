@@ -4,8 +4,8 @@
 class CTPTMoogLadderFilter
 {
 public:
-	CTPTMoogLadderFilter(void);
-	~CTPTMoogLadderFilter(void);
+	CTPTMoogLadderFilter();
+	~CTPTMoogLadderFilter();
 
 protected:
 	CTPTMoogFilterStage filter1;
@@ -56,4 +56,10 @@ public:
 	}
 
 	float doTPTMoogLPF(float xn);
+
+	bool isStable()
+	{
+		const auto z = filter1.getStorageRegisterValue();
+		return !isnan(z) && isfinite(z);
+	}
 };

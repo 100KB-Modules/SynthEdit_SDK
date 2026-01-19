@@ -26,7 +26,7 @@ void EnvRetriggerModeAutoSet::subProcess( int bufferOffset, int sampleFrames )
 	}
 }
 
-void EnvRetriggerModeAutoSet::onSetPins(void)
+void EnvRetriggerModeAutoSet::onSetPins()
 {
 	bool forcedReset = pinVoiceReset.isUpdated() && pinVoiceReset == 1.0f; // > 0.0f;
 

@@ -669,7 +669,7 @@ float ExtractPeriod(vector<float>& sample, int autocorrelateto = 0, int slot = 0
 					//SHFT2(f2,f1,(*f)(x1)) // and its new function evaluation.
 					SHFT2(f2,f1,-resamp(x1, autoCorrelation, n, filtering, 1.0, sincSize)) // and its new function evaluation.
 				}
-				_RPT0(_CRT_WARN, "*" );
+//				_RPT0(_CRT_WARN, "*" );
 			} // Back to see if we are done.
 			if (f1 < f2) { // We are done. Output the best of the two
 				*xmin=x1; // current values.
@@ -697,7 +697,7 @@ float ExtractPeriod(vector<float>& sample, int autocorrelateto = 0, int slot = 0
 
 				debugtrace[3][j] = min(6.0f, debugtrace[3][j]); // clip Correlation
 			}
-
+/*
 			_RPT0(_CRT_WARN, "Sample, FFT, Window, Correlation \n" );
 			for (int j = 1; j < correlateCount; ++j)
 			{
@@ -708,6 +708,7 @@ float ExtractPeriod(vector<float>& sample, int autocorrelateto = 0, int slot = 0
 				_RPT0(_CRT_WARN, "\n" );
 			}
 //			_RPT1(_CRT_WARN, "Period %f\n", bestPeriod );
+*/
 		}
 #endif
 

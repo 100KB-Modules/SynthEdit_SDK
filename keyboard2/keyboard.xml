@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 
 <PluginList>
-  <Plugin id="SynthEdit Keyboard2"  name="Keyboard2" category="Controls" graphicsApi="composited" polyphonicSource="true" cloned="true" helpUrl="Keyboard2.htm">
+  <Plugin id="SynthEdit Keyboard2"  name="Keyboard (CV)" category="Controls" graphicsApi="composited" polyphonicSource="true" cloned="true" helpUrl="Keyboard2.htm">
     <Audio>
       <Pin id="0" name="PitchX" direction="in" datatype="float" hostConnect="Voice/Pitch" />
       <Pin id="1" name="TriggerX" direction="in" datatype="float" hostConnect="Voice/Trigger" />

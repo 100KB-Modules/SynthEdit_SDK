@@ -13,8 +13,8 @@ class MenuCombinerGui : public SeGuiInvisibleBase
  	IntGuiPin pinChoiceOut;
  	BoolGuiPin pinASupportMomentary;
  	BoolGuiPin pinBSuportMomentary;
-	StringGuiPin pinASubmenu;
-	StringGuiPin pinBSubmenu;
+	StringGuiPin pinASubmenuTitle;
+	StringGuiPin pinBSubmenuTitle;
 
 	int firstListStartIndex = 0;
 	int secondListStartIndex = 0;
@@ -30,8 +30,8 @@ public:
 		initializePin( pinItemListOut);
 		initializePin(pinASupportMomentary);
 		initializePin(pinBSuportMomentary);
-		initializePin(pinASubmenu, static_cast<MpGuiBaseMemberPtr2>(&MenuCombinerGui::onSetItemListIn));
-		initializePin(pinBSubmenu, static_cast<MpGuiBaseMemberPtr2>(&MenuCombinerGui::onSetItemListIn));
+		initializePin(pinASubmenuTitle, static_cast<MpGuiBaseMemberPtr2>(&MenuCombinerGui::onSetItemListIn));
+		initializePin(pinBSubmenuTitle, static_cast<MpGuiBaseMemberPtr2>(&MenuCombinerGui::onSetItemListIn));
 	}
 
 	void onSetItemListIn()
@@ -40,10 +40,10 @@ public:
 
 		firstListStartIndex = 0;
 
-		if (!pinASubmenu.getValue().empty())
+		if (!pinASubmenuTitle.getValue().empty())
 		{
 			combinedList.append(L">>>>");
-			combinedList.append(pinASubmenu.getValue());
+			combinedList.append(pinASubmenuTitle.getValue());
 			++firstListStartIndex;
 		}
 
@@ -54,19 +54,14 @@ public:
 		{
 			enum_entry* e = it.CurrentItem();
 
-			if (combinedList.empty())
-			{
-				combinedList.append(e->text);
-				combinedList.append(L"=1");
-			}
-			else
+			if (!combinedList.empty())
 			{
 				combinedList.append(L",");
-				combinedList.append(e->text);
 			}
+			combinedList.append(e->text);
 			++secondListStartIndex;
 		}
-		if (!pinASubmenu.getValue().empty())
+		if (!pinASubmenuTitle.getValue().empty())
 		{
 			if (!combinedList.empty())
 			{
@@ -78,32 +73,27 @@ public:
 		}
 
 		// 2nd list
-		if (!pinBSubmenu.getValue().empty())
+		if (!pinBSubmenuTitle.getValue().empty())
 		{
 			if (!combinedList.empty())
 			{
 				combinedList.append(L",");
 			}
 			combinedList.append(L">>>>");
-			combinedList.append(pinBSubmenu.getValue());
+			combinedList.append(pinBSubmenuTitle.getValue());
 			++secondListStartIndex;
 		}
 		it_enum_list it2(pinBItemList);
 		for (it2.First(); !it2.IsDone(); it2.Next())
 		{
 			enum_entry* e = it2.CurrentItem();
-			if (combinedList.empty())
-			{
-				combinedList.append(e->text);
-				combinedList.append(L"=1");
-			}
-			else
+			if (!combinedList.empty())
 			{
 				combinedList.append(L",");
-				combinedList.append(e->text);
 			}
+			combinedList.append(e->text);
 		}
-		if (!pinBSubmenu.getValue().empty())
+		if (!pinBSubmenuTitle.getValue().empty())
 		{
 			if (!combinedList.empty())
 			{
@@ -117,59 +107,34 @@ public:
 
 	void onSetChoice()
 	{
-		if (pinChoiceOut == 0)
+		if (pinChoiceOut == -1)
 		{
 			if (pinASupportMomentary)
 			{
-				pinAChoice = 0;
+				pinAChoice = -1;
 			}
 			if (pinBSuportMomentary)
 			{
-				pinBChoice = 0;
+				pinBChoice = -1;
 			}
 			return;
 		}
 
+		int i = pinChoiceOut; // output index starts at one.
+
 		it_enum_list it(pinAItemList);
-		if (it.FindIndex(pinChoiceOut - firstListStartIndex))
+		if (it.FindIndex(i - firstListStartIndex))
 		{
 			pinAChoice = it.CurrentItem()->value;
 		}
 		else
 		{
 			it_enum_list it2(pinBItemList);
-			if (it2.FindIndex(pinChoiceOut - secondListStartIndex))
+			if (it2.FindIndex(i - secondListStartIndex))
 			{
 				pinBChoice = it2.CurrentItem()->value;
 			}
 		}
-/*
-		int indexOut = 1;
-
-		it_enum_list it(pinAItemList);
-		for (it.First(); !it.IsDone(); it.Next())
-		{
-			enum_entry* e = it.CurrentItem();
-			if (indexOut == pinChoiceOut)
-			{
-				pinAChoice = e->value;
-				return;
-			}
-			++indexOut;
-		}
-
-		it_enum_list it2(pinBItemList);
-		for (it2.First(); !it2.IsDone(); it2.Next())
-		{
-			enum_entry* e = it2.CurrentItem();
-			if (indexOut == pinChoiceOut)
-			{
-				pinBChoice = e->value;
-				return;
-			}
-			++indexOut;
-		}
-		*/
 	}
 };
 

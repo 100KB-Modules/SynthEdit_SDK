@@ -1,5 +1,4 @@
-#ifndef ADSRDSP_H_INCLUDED
-#define ADSRDSP_H_INCLUDED
+#pragma once
 
 #include "Envelope.h"
 
@@ -14,6 +13,4 @@ private:
 	AudioInPin pinSustain;
 	AudioInPin pinRelease;
 };
-
-#endif
 

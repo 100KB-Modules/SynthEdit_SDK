@@ -67,15 +67,26 @@ void WaveRecorder2::subProcess(int sampleFrames)
 		}
 	}
 
+	int64_t todo = sampleFrames;
+	if (maxFrames > 0)
+	{
+		todo = (std::min)(todo, maxFrames - sampleFrameCount);
+		if (todo == 0)
+		{
+			SET_PROCESS2(&WaveRecorder2::subProcessNothing);
+			return;
+		}
+	}
+
 	const int sampleSizeBytes = sizeof(float) / sizeof(char);
 	size_t Channels = AudioInPtrs.size();
-	size_t s = sampleFrames * sampleSizeBytes * Channels;
+	size_t s = todo * sampleSizeBytes * Channels;
 	if( fwrite(&( AudioBuffer[0] ), 1, s, outputStream) != s )
 	{
 		//error
 	}
 
-	sampleFrameCount += sampleFrames;
+	sampleFrameCount += todo;
 }
 
 void WaveRecorder2::subProcess16bit(int sampleFrames)
@@ -100,18 +111,30 @@ void WaveRecorder2::subProcess16bit(int sampleFrames)
 		}
 	}
 
+	int64_t todo = sampleFrames;
+	if(maxFrames > 0)
+	{
+		todo = (std::min)(todo, maxFrames - sampleFrameCount);
+		if (todo == 0)
+		{
+			CloseFile();
+			SET_PROCESS2(&WaveRecorder2::subProcessNothing);
+			return;
+		}
+	}
+
 	const int sampleSizeBytes = sizeof(short) / sizeof(char);
-	int Channels = AudioInPtrs.size();
-	size_t s = sampleFrames * sampleSizeBytes * Channels;
+	const auto Channels = AudioInPtrs.size();
+	size_t s = todo * sampleSizeBytes * Channels;
 	if( fwrite(&( AudioBuffer[0] ), 1, s, outputStream) != s )
 	{
 		//error
 	}
 
-	sampleFrameCount += sampleFrames;
+	sampleFrameCount += todo;
 }
 
-void WaveRecorder2::onSetPins(void)
+void WaveRecorder2::onSetPins()
 {
 	// Check which pins are updated.
 	if( pinFileName.isUpdated() )
@@ -124,6 +147,8 @@ void WaveRecorder2::onSetPins(void)
 
 			wchar_t fullFilename[500];
 			getHost()->resolveFilename(filename.c_str(), sizeof(fullFilename) / sizeof(fullFilename[0]), fullFilename);
+
+			// TODO 			const auto fullFileName = host.resolveFilename(filename);
 
 			if( outputStream != 0 )
 			{
@@ -139,7 +164,7 @@ void WaveRecorder2::onSetPins(void)
 
 			if( outputStream == 0 )
 			{
-#ifndef SE_TARGET_WAVES
+#ifdef _WIN32
 				MessageBoxA(0, "WaveRecorder2: Failed to open output file.", "debug msg", MB_OK);
 #endif
 				return;
@@ -197,15 +222,19 @@ void WaveRecorder2::onSetPins(void)
 			setSleep(true);
 		}
 	}
-	if( pinFormat.isUpdated() )
-	{
-	}
+
 	if( pinTimeLimit.isUpdated() )
 	{
+		maxFrames = static_cast<int64_t>(pinTimeLimit.getValue() * getSampleRate());
 	}
 }
 
 WaveRecorder2::~WaveRecorder2()
+{
+	CloseFile();
+}
+
+void WaveRecorder2::CloseFile()
 {
 	if( outputStream )
 	{
@@ -222,5 +251,6 @@ WaveRecorder2::~WaveRecorder2()
 
 		// close the file.
 		fclose(outputStream);
+		outputStream = {};
 	}
 }

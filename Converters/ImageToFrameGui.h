@@ -13,6 +13,6 @@ public:
 	IntGuiPin frameCount;
 	IntGuiPin frameNumber;
 private:
-	void OnSetAnimationPosition(void);
-	void OnSetFrameNumber(void);
+	void OnSetAnimationPosition();
+	void OnSetFrameNumber();
 };

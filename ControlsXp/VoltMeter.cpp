@@ -1,6 +1,7 @@
 #include "./VoltMeter.h"
 #include <math.h>
 
+SE_DECLARE_INIT_STATIC_FILE(VoltMeter)
 REGISTER_PLUGIN2 ( VoltMeter, L"SE Volt Meter" );
 
 VoltMeter::VoltMeter( ) :
@@ -61,19 +62,8 @@ void VoltMeter::subProcessAc(int sampleFrames)
 	}
 }
 
-void VoltMeter::onSetPins(void)
+void VoltMeter::onSetPins()
 {
-	// Check which pins are updated.
-	if( pinSignalin.isStreaming() )
-	{
-	}
-	if( pinMode.isUpdated() )
-	{
-	}
-	if( pinUpdateRate.isUpdated() )
-	{
-	}
-
 	// Set processing method.
 	if(pinMode == 0)
 		setSubProcess(&VoltMeter::subProcess);

@@ -1,10 +1,15 @@
 #include "./PolyphonyControlGui.h"
+#include "../shared/voice_allocation_modes.h"
 
 using namespace gmpi;
 using namespace gmpi_gui;
 
+using namespace voice_allocation;
+using namespace voice_allocation::bits;
+
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, PolyphonyControlGui1, L"SE Polyphony Control");
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, PolyphonyControlGui2, L"SE Polyphony Control2");
+SE_DECLARE_INIT_STATIC_FILE(PolyphonyControl_Gui)
 
 PolyphonyControlGui1::PolyphonyControlGui1()
 {
@@ -66,15 +71,15 @@ PolyphonyControlGui2::PolyphonyControlGui2()
 	initializePin(itemList_voiceSteal);
 
 
-	initializePin(monoMode, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetVoiceStealMode ));
-	initializePin(monoRetrigger, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetVoiceStealMode ));
+	initializePin(monoMode, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetMonoMode ));
+	initializePin(monoRetrigger, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetMonoMode ));
 	initializePin(monoNotePriority, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui_base::onSetNotePriority ));
 	initializePin(itemList2);
 
 	initializePin(PortamentoTime, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetPortamento ));
 	initializePin(GlideType, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetGlide ));
 	initializePin(itemList_GlideType);
-	initializePin(GlideTiming, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetGlide ));
+	initializePin(GlideTiming, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetGlideTiming));
 	initializePin(itemList_GlideTiming);
 
 	initializePin(BendRange, static_cast<MpGuiBaseMemberPtr2>( &PolyphonyControlGui2::onSetBendRange ));
@@ -154,13 +159,29 @@ void PolyphonyControlGui_base::onSetHostPolyphonyReserve()
 
 void PolyphonyControlGui1::onSetVoiceAllocationMode()
 {
+	auto v = hostVoiceAllocationMode.getValue();
+
 	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xffffff00 ) | voiceAllocationMode;
+
+	assert(hostVoiceAllocationMode == insertBits(v, 0, 8, voiceAllocationMode));
+}
+
+void PolyphonyControlGui2::onSetMonoMode()
+{
+	const int flags
+		= MM_IN_USE
+		| (monoMode.getValue() ? MM_ON : 0)
+		| (monoRetrigger.getValue() ? MM_RETRIGGER : 0);
+
+	const auto v = hostVoiceAllocationMode.getValue();
+	hostVoiceAllocationMode = insertBits(v, MonoModes_startbit, MonoModes_sizebits, flags);
 }
 
 void PolyphonyControlGui2::onSetVoiceStealMode()
 {
 	// 	L"Poly,Poly (Hard),Poly (Overlap), Mono=4, Mono (Retrigger)";
-
+	auto v = hostVoiceAllocationMode.getValue();
+/*
 	int combinedVoiceAllocationMode;
 	if( monoMode )
 	{
@@ -177,53 +198,84 @@ void PolyphonyControlGui2::onSetVoiceStealMode()
 	{
 		combinedVoiceAllocationMode = voiceStealMode;
 	}
+*/
+	const int combinedVoiceAllocationMode = voiceStealMode & 0x03;
 
 	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xffffff00 ) | combinedVoiceAllocationMode;
+
+	assert(hostVoiceAllocationMode == insertBits(v, 0, 8, combinedVoiceAllocationMode));
 }
 
 void PolyphonyControlGui_base::onSetNotePriority()
 {
-	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xffff00ff ) | ( monoNotePriority << 8 );
+	const auto v = hostVoiceAllocationMode.getValue();
+	hostVoiceAllocationMode = insertBits(v, NotePriority_startbit, NotePriority_sizebits, monoNotePriority);
 }
 
 void PolyphonyControlGui2::onSetVoiceRefresh()
 {
+	auto v = hostVoiceAllocationMode.getValue();
+
 	const int bitPosistion = 19;
 	const int mask = ~(1 << bitPosistion);
 	hostVoiceAllocationMode = (hostVoiceAllocationMode & mask) | ((VoiceRefresh & 0x01) << bitPosistion);
+
+	assert(hostVoiceAllocationMode == insertBits(v, 19, 1, VoiceRefresh));
 }
 
 void PolyphonyControlGui2::onSetGlide()
 {
-	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xfffcffff ) | ( GlideType << 16 );
+	auto v = hostVoiceAllocationMode.getValue();
+
+// should be 0xfffeffff	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xfffcffff ) | ( GlideType << 16 );
+
+//	assert(hostVoiceAllocationMode == insertBits(v, 16, 1, GlideType));
+
+	hostVoiceAllocationMode = insertBits(v, 16, 1, GlideType);
 }
 
 void PolyphonyControlGui2::onSetGlideTiming()
 {
+	auto v = hostVoiceAllocationMode.getValue();
+
 	hostVoiceAllocationMode = ( hostVoiceAllocationMode & 0xfffbffff ) | ( GlideTiming << 18 );
+
+	assert(hostVoiceAllocationMode == insertBits(v, 18, 1, GlideTiming));
 }
 
 void PolyphonyControlGui1::onSetHostVoiceAllocationMode()
 {
 	voiceAllocationMode = 0xff & hostVoiceAllocationMode;
 	monoNotePriority = 0xff & ( ( (int)hostVoiceAllocationMode ) >> 8 );
+
+	auto v = hostVoiceAllocationMode.getValue();
+
+	assert(voiceAllocationMode == extractBits(v, 0, 8));
+	assert(monoNotePriority == extractBits(v, 8, 8));
 }
 
 void PolyphonyControlGui2::onSetHostVoiceAllocationMode()
 {
-//	voiceAllocationMode = 0xff & hostVoiceAllocationMode;
-	monoNotePriority = 0xff & ( ( (int)hostVoiceAllocationMode ) >> 8 );
+	const auto allocationMode = hostVoiceAllocationMode.getValue();
+
+	monoNotePriority = 0x03 & ( ( (int)hostVoiceAllocationMode ) >> 8 );
 	GlideType = 0x01 & ( ( (int)hostVoiceAllocationMode ) >> 16 );
 	GlideTiming = 0x01 & ( ( (int)hostVoiceAllocationMode ) >> 18 );
 
 	voiceStealMode = 0x03 & ( (int)hostVoiceAllocationMode );
 
-	monoMode = 0 != (0x04 & ( (int)hostVoiceAllocationMode ));
-	monoRetrigger = ( 0x0f & ( (int)hostVoiceAllocationMode ) ) == 5;
+	monoMode = isMonoMode(allocationMode);
+	monoRetrigger = isMonoRetrigger(allocationMode);
 
 	{
 		const int bitPosistion = 19;
 		VoiceRefresh = 0x01 & (((int)hostVoiceAllocationMode) >> bitPosistion);
 	}
+
+	assert(monoNotePriority == extractBits(allocationMode, 8, 2));
+	assert(GlideType == extractBits(allocationMode, 16, 1));
+	assert(GlideTiming == extractBits(allocationMode, 18, 1));
+	assert(voiceStealMode == extractBits(allocationMode, 0, 2));
+	assert(VoiceRefresh.getValue() == extractBits(allocationMode, 19, 1));
 }
 

@@ -1,10 +1,11 @@
 #pragma once
 #include <assert.h>
+#include <math.h> 
 
 class CVAOnePoleFilter
 {
 public:
-	CVAOnePoleFilter(void);
+	CVAOnePoleFilter();
 	
 	// common variables
 	float m_fSampleRate;	/* sample rate*/
@@ -38,13 +39,7 @@ public:
 		// update memory
 		m_fZ1 = vn + lpf;
 
-		// do the HPF
-//		float hpf = xn - lpf;
-
 		assert(m_uFilterType != HPF1);
-//			return hpf;
-
-		// default
 		return lpf;
 	}
 
@@ -63,12 +58,13 @@ public:
 		float hpf = xn - lpf;
 
 		assert(m_uFilterType == HPF1);
-			return hpf;
-
-		// default
-//		return lpf;
+		return hpf;
 	}
 
+	bool isStable()
+	{
+		return !isnan(m_fZ1) && isfinite(m_fZ1);
+	}
 protected:
 	float m_fZ1;		// our z-1 storage location
 };

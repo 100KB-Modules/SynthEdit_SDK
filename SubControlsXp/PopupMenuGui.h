@@ -11,10 +11,10 @@ public:
 	PopupMenuGui();
 
 	// overrides.
-	virtual int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point);
-	virtual int32_t MP_STDCALL onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+	int32_t MP_STDCALL onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
+	int32_t MP_STDCALL onPointerUp(int32_t flags, GmpiDrawing_API::MP1_POINT point) override;
 
-	virtual std::string getDisplayText() override;
+	std::string getDisplayText() override;
 	void OnPopupComplete(int32_t result);
 
 private:

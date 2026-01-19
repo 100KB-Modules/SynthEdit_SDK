@@ -27,7 +27,7 @@ void VoiceWatcherBlocker::subProcess( int bufferOffset, int sampleFrames )
 
 }
 
-void VoiceWatcherBlocker::onSetPins(void)
+void VoiceWatcherBlocker::onSetPins()
 {
 	// Set state of output audio pins.
 	pinSignalOut.setStreaming( pinSignalIn.isStreaming() );

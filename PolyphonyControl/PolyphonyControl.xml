@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 
 <PluginList>
-  <Plugin id="SE Polyphony Control" name="Polyphony Control" category="Special" graphicsApi="none" helpUrl="synthedit.chm::/mdl_sdk3/PolyphonyControl.htm">
+  <Plugin id="SE Polyphony Control" name="Polyphony Control" category="Old" graphicsApi="none" helpUrl="synthedit.chm::/mdl_sdk3/PolyphonyControl.htm">
     <GUI>
       <Pin id="0" name="Host Polyphony" direction="in" datatype="int" hostConnect="Polyphony" />
       <Pin id="1" name="Host Polyphony Reserve" direction="in" datatype="int" hostConnect="ReserveVoices" />
@@ -17,7 +17,7 @@
     </GUI>
   </Plugin>
   
-  <Plugin id="SE Polyphony Control2" name="Polyphony Control" category="Experimental" graphicsApi="none" helpUrl="synthedit.chm::/mdl_sdk3/PolyphonyControl.htm">
+  <Plugin id="SE Polyphony Control2" name="Polyphony Control" category="MIDI" graphicsApi="none" helpUrl="synthedit.chm::/mdl_sdk3/PolyphonyControl.htm">
     <GUI>
       <Pin name="Host Polyphony" direction="in" datatype="int" hostConnect="Polyphony" />
       <Pin name="Host Polyphony Reserve" direction="in" datatype="int" hostConnect="ReserveVoices" />

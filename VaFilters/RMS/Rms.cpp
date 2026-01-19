@@ -38,7 +38,7 @@ int32_t Rms::open()
 }
 */
 
-void Rms::onSetPins(void)
+void Rms::onSetPins()
 {
 //	if (pinResonance.isUpdated() && !pinResonance.isStreaming())
 	{

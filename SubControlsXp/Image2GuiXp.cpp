@@ -10,6 +10,7 @@ using namespace gmpi_gui;
 using namespace GmpiDrawing;
 
 GMPI_REGISTER_GUI(MP_SUB_TYPE_GUI2, Image2GuiXp, L"Image3");
+SE_DECLARE_INIT_STATIC_FILE(Image3_Gui);
 
 Image2GuiXp::Image2GuiXp(bool useMouseResponsePin) :
 	useMouseResponsePin_(useMouseResponsePin)
@@ -51,9 +52,26 @@ int Image2GuiXp::getMouseResponse()
 	}
 
 	if (useMouseResponsePin_)
-		return pinMouseResponse;
+		return (std::max)(-1, pinMouseResponse.getValue()); // -2 in enum = off, which is mouse_reponse -1
 	else
 		return 0;
+}
+
+int32_t Image2GuiXp::onMouseWheel(int32_t flags, int32_t delta, GmpiDrawing_API::MP1_POINT point)
+{
+	// ignore horizontal scrolling
+	if (0 != (flags & gmpi_gui_api::GG_POINTER_KEY_SHIFT))
+		return gmpi::MP_UNHANDLED;
+
+	if (!skinBitmap::bitmapHitTestLocal(point))
+		return MP_UNHANDLED;
+
+	const float scale = (flags & gmpi_gui_api::GG_POINTER_KEY_CONTROL) ? 1.0f / 12000.0f : 1.0f / 1200.0f;
+	const float newval = getAnimationPos() + delta * scale;
+	setAnimationPos(std::clamp(newval, 0.0f, 1.0f));
+	calcDrawAt();
+
+	return gmpi::MP_OK;
 }
 
 int32_t Image2GuiXp::onPointerDown(int32_t flags, GmpiDrawing_API::MP1_POINT point)

@@ -167,7 +167,7 @@ public:
 	enum EWaveShape { WS_SINE, WS_SAW, WS_PULSE, WS_TRI	};
 
 	OscillatorNaive( );
-	virtual int32_t MP_STDCALL open() override;
+	int32_t MP_STDCALL open() override;
 
 	template< class WaveShapePolicy, class PitchModulationPolicy, class phaseModulationPolicy, class SyncModulationPolicy >
 	void subProcess(int sampleFrames)
@@ -179,30 +179,24 @@ public:
 		float* audioOut = getBuffer(pinAudioOut);
 
 		float* phaseMod;
-		if(phaseModulationPolicy::Active || SyncModulationPolicy::Active) // Need phase available for sync also.
+		if constexpr (phaseModulationPolicy::Active || SyncModulationPolicy::Active) // Need phase available for sync also.
 			phaseMod = getBuffer(pinPhaseMod);
 
 		for (int s = sampleFrames; s > 0; --s)
 		{
 			PitchModulationPolicy::Calculate(pitchTable, pitch, increment);
 
-			if (phaseModulationPolicy::Active)
+			if constexpr (phaseModulationPolicy::Active)
 			{
 				double delataPhase = prevPhase - *phaseMod;
 				prevPhase = *phaseMod;
 
 				accumulator += delataPhase * 0.5f;
 				assert(accumulator > 0.0f);
-				/*
-				if (grains[g].count < 0.0f) // wrapped -ve?
-				{
-					grains[g].count += 10.0f;
-				}
-				*/
 			}
 
 			// trigger sync?
-			if (SyncModulationPolicy::Active)
+			if constexpr (SyncModulationPolicy::Active)
 			{
 				if ((*sync > 0.0f) != syncState)
 				{
@@ -236,7 +230,7 @@ public:
 		accumulator -= (std::max)( 0, accumulator_floor - 20);
 	}
 
-	virtual void onSetPins(void);
+    void onSetPins() override;
 
 private:
 	AudioInPin pinPitch;

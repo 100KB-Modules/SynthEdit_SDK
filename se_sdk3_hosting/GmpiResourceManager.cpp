@@ -79,6 +79,7 @@ int32_t GmpiResourceManager::RegisterResourceUri(int32_t moduleHandle, const std
 	{
 		if (strcmp(resourceType, "Image") == 0 || strcmp(resourceType, "png") == 0 || strcmp(resourceType, "svg") == 0)
 		{
+			// see also: isSkinImageFile()
 			searchExtensions.push_back(L".png");
 			searchExtensions.push_back(L".bmp");
 			searchExtensions.push_back(L".jpg");
@@ -321,7 +322,7 @@ int32_t GmpiResourceManager::OpenUri(const char* fullUri, gmpi::IProtectedFile2*
 	sp = strstr(fullUri, "global");
 	if (sp != nullptr) // special magic 'file'.
 	{
-		std::string skinName(fullUri, sp - fullUri - 1);
+		std::string skinName(fullUri, (std::max)((int64_t)0, sp - fullUri - 1));
 		std::string temp = SkinMgr::Instance()->getEffectiveFontInfo(Utf8ToWstring(skinName).c_str());
 		*returnStream = new ProtectedMemFile2(temp.data(), temp.size());
 		return gmpi::MP_OK;

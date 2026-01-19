@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <PluginList>
-  <Plugin id="SE Impulse Response2" name="Impulse Response" category="Experimental" helpUrl="SE Impulse Response.html" >
+  <Plugin id="SE Impulse Response2" name="Impulse Response" category="Diagnostic" helpUrl="SE Impulse Response.html" >
     <Parameters>
       <Parameter id="0" datatype="blob" name="Results" private="true" ignorePatchChange="true" persistant="false" />
       <Parameter id="1" datatype="float" name="sampleRate" private="true" ignorePatchChange="true" persistant="false" />
@@ -17,8 +17,14 @@
       <Pin name="sampleRate" datatype="float" private="true" parameterId="1" />
     </GUI>
   </Plugin>
+  <Plugin id="SE Impulse" name="Impulse" category="Diagnostic" helpUrl="Impulse.htm">
+    <Audio>
+      <Pin name="Trigger" datatype="float" rate="audio" default="0.6"/>"
+      <Pin name="Impulse Out" direction="out" datatype="float" rate="audio"/>"
+    </Audio>
+  </Plugin>
   
-  <Plugin id="SE Keyboard (MIDI)" name="Keyboard (MIDI)" category="Experimental">
+  <Plugin id="SE Keyboard (MIDI)" name="Keyboard (MIDI)" category="Controls">
     <GUI graphicsApi="GmpiGui" />
     <Audio>
       <Pin name="Channel" datatype="enum" ignorePatchChange="true" metadata="All=-1,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16" />
@@ -28,7 +34,7 @@
   
   <Plugin id="SE Midi Monitor" name="Midi Monitor" category="Diagnostic" >
     <Parameters>
-      <Parameter id="0" datatype="string" persistant="false" />
+      <Parameter id="0" datatype="string" ignorePatchChange="true" persistant="false" />
     </Parameters>
     <Audio>
       <Pin name="MIDI In" datatype="midi" />
@@ -41,7 +47,7 @@
 
   <Plugin id="SE Monitor" name="Monitor" category="Diagnostic" voiceMonitorIgnore="true" >
     <Parameters>
-      <Parameter id="0" datatype="string" persistant="false" />
+      <Parameter id="0" datatype="string" ignorePatchChange="true" persistant="false" />
     </Parameters>
     <Audio>
       <Pin name="MIDI In" datatype="midi" />
@@ -61,7 +67,7 @@
     </GUI>
   </Plugin>
   
-  <Plugin id="SE Waveshaper3 XP" name="Waveshaper3 XP" category="Experimental">
+  <Plugin id="SE Waveshaper3 XP" name="Waveshaper3" category="Modifiers">
     <Parameters>
       <Parameter id="0" datatype="string" name="Shape" default="(-5.0,-5.0)(-4.0,-4.0)(-3.0,-3.0)(-2.0,-2.0)(-1.0,-1.0)(0.0,0.0)(1.0,1.0)(2.0,2.0)(3.0,3.0)(4.0,4.0)(5.0,5.0)" />
     </Parameters>
@@ -75,7 +81,7 @@
     </GUI>
   </Plugin>
 
-  <Plugin id="SE Waveshaper2 XP" name="Waveshaper2 XP" category="Experimental" >
+  <Plugin id="SE Waveshaper2 XP" name="Waveshaper2" category="Modifiers" >
     <Parameters>
       <Parameter id="0" datatype="string" name="Shape" default="5 * sin(x/PI)" />
     </Parameters>
@@ -90,7 +96,7 @@
   </Plugin>
   <Plugin id="SE Volt Meter" name="Volt Meter" category="Controls">
     <Parameters>
-      <Parameter id="0" datatype="float" name="patchValue" ignorePatchChange="true" />
+      <Parameter id="0" datatype="float" name="patchValue" ignorePatchChange="true" persistant="false"/>
     </Parameters>
     <Audio>
       <Pin name="Signal in" datatype="float" rate="audio" linearInput="true" />
@@ -112,7 +118,8 @@
       <Pin name="Capture Data A" direction="out" datatype="blob" parameterId="0" private="true"/>
       <Pin name="Signal in" datatype="float" rate="audio" linearInput="true" />
       <Pin name="FFT Size" datatype="enum" isMinimised="true" default="2048" metadata="1024=1024,2048=2048,4096=4096,8192=8192,16384=16384" />
-    </Audio>
+	  <Pin name="Update Rate" datatype="enum" isMinimised="true" default="10" metadata="1 Hz=1,5 Hz=5,10 Hz=10,20 Hz=20,40 Hz=40,60 Hz=60" />
+	</Audio>
     <GUI>
       <Pin name="Capture Data A" datatype="blob" parameterId="0" private="true" />
       <Pin name="Mode" datatype="enum" isMinimised="true" metadata="Log,Linear" />
@@ -120,9 +127,26 @@
       <Pin name="dB Low" datatype="int" isMinimised="true" default="-80" />
     </GUI>
   </Plugin>
-  
-  <!-- Drop-in replacement for KeyBoard2 -->
-  <Plugin id="SE Keyboard2" name="Keyboard2" category="Experimental" helpUrl="Keyboard2.html" graphicsApi="GmpiGui" polyphonicSource="true" polyphonic="true" cloned="true">
+    
+    <Plugin id="SE Freq Analyser3" name="Freq Analyser3" category="Debug">
+        <Parameters>
+            <Parameter id="0" datatype="blob" name="Capture Data A" private="true" ignorePatchChange="true" persistant="false"/>
+        </Parameters>
+        <Audio>
+            <Pin name="Capture Data A" datatype="blob" direction="out" private="true" parameterId="0"/>
+            <Pin name="Signal in" datatype="float" rate="audio" linearInput="true"/>
+            <Pin name="FFT Size" datatype="enum" default="2048" metadata="1024=1024,2048=2048,4096=4096,8192=8192,16384=16384"/>
+            <Pin name="Update Rate" datatype="enum" default="10" metadata="1 Hz=1,5 Hz=5,10 Hz=10,20 Hz=20,30 Hz=30,40 Hz=40,60 Hz=60"/>
+        </Audio>
+        <GUI graphicsApi="GmpiGui">
+            <Pin name="Capture Data A" datatype="blob" private="true" parameterId="0"/>
+            <Pin name="dB High" datatype="int" default="6" />
+            <Pin name="dB Low" datatype="int" default="-120" />
+        </GUI>
+    </Plugin>
+
+    <!-- Drop-in replacement for KeyBoard2 -->
+  <Plugin id="SE Keyboard2" name="Keyboard (CV)" category="Controls" helpUrl="Keyboard2.html" graphicsApi="GmpiGui" polyphonicSource="true" polyphonic="true" cloned="true">
     <Audio>
       <Pin name="PitchX" datatype="float" private="true" hostConnect="Voice/Pitch" />
       <Pin name="TriggerX" datatype="float" private="true" hostConnect="Voice/Trigger" />
@@ -155,8 +179,30 @@
     </GUI>
   </Plugin>
   
+  <Plugin id="SE Keyboard (MPE)" name="Keyboard (MPE)" category="Controls">
+    <GUI graphicsApi="GmpiGui">
+      <Pin name="Gate" datatype="float" isPolyphonic="true" hostConnect="Voice/Gate" />
+      <Pin name="Trigger" datatype="float" isPolyphonic="true" hostConnect="Voice/Trigger" />
+      <Pin name="Pitch" datatype="float" isPolyphonic="true" hostConnect="Voice/Pitch" />
+      <Pin name="KeyBend" datatype="float" isPolyphonic="true" hostConnect="Voice/Bender" />
+      <Pin name="VelocityKeyOn" datatype="float" isPolyphonic="true" hostConnect="Voice/VelocityKeyOn" />
+      <Pin name="Aftertouch" datatype="float" isPolyphonic="true" hostConnect="Voice/Aftertouch" />
+      <Pin name="Brightness" datatype="float" isPolyphonic="true" hostConnect="Voice/Brightness" />
+    </GUI>
+    
+    <Audio>
+      <Pin name="Gate" datatype="float" hostConnect="Voice/Gate" />
+      <Pin name="Trigger" datatype="float" hostConnect="Voice/Trigger" />
+      <Pin name="Pitch" datatype="float" hostConnect="Voice/Pitch" />
+      <Pin name="KeyBend" datatype="float" hostConnect="Voice/Bender" />
+      <Pin name="VelocityKeyOn" datatype="float" hostConnect="Voice/VelocityKeyOn" />
+      <Pin name="Aftertouch" datatype="float" hostConnect="Voice/Aftertouch" />
+      <Pin name="Brightness" datatype="float" hostConnect="Voice/Brightness" />
+    </Audio>
+  </Plugin>
+
   <!-- Drop-in replacement for classic slider -->
-  <Plugin id="SE Slider" name="Slider" category="Experimental" graphicsApi="GmpiGui">
+  <Plugin id="SE Slider" name="Slider" category="Debug/DirectX" graphicsApi="GmpiGui">
     <Parameters>
       <Parameter id="0" datatype="float" name="s1" />
     </Parameters>
@@ -184,7 +230,7 @@
   </Plugin>
   
   <!-- New improved Slider -->
-  <Plugin id="SE Slider2" name="Slider2" category="Experimental" graphicsApi="GmpiGui">
+  <Plugin id="SE Slider2" name="Slider2" category="Debug" graphicsApi="GmpiGui">
     <Parameters>
       <Parameter id="0" datatype="float" name="s1" />
     </Parameters>
@@ -207,7 +253,7 @@
     </GUI>
   </Plugin>
 
-  <Plugin id="SE List Entry" name="List Entry" category="Experimental" graphicsApi="GmpiGui">
+  <Plugin id="SE List Entry" name="List Entry" category="Debug/DirectX" graphicsApi="GmpiGui">
     <Parameters>
       <Parameter id="0" datatype="enum" name="s1" />
     </Parameters>
@@ -224,10 +270,13 @@
       <Pin name="Show Title On Panel" datatype="bool" default="1" isMinimised="true" redrawOnChange="true"/>
  -->
       <Pin name="Title" datatype="string" isMinimised="true" />
+      
+      <Pin name="Menu Items" datatype="string" private="true" parameterId="0" parameterField="MenuItems" />
+      <Pin name="Menu Selection" datatype="int" private="true" parameterId="0" parameterField="MenuSelection" />
     </GUI>
   </Plugin>
   
-  <Plugin id="SE Text Entry" name="Text Entry" category="Experimental" graphicsApi="GmpiGui">
+  <Plugin id="SE Text Entry" name="Text Entry" category="Debug/DirectX" graphicsApi="GmpiGui">
     <Parameters>
       <Parameter id="0" datatype="string" name="patchValue" />
     </Parameters>
@@ -245,15 +294,15 @@
     </GUI>
   </Plugin>
   
-  <Plugin id="SE Scope3 XP" name="Scope3 (xp)" category="Experimental" graphicsApi="GmpiGui" >
+  <Plugin id="SE Scope3 XP" name="Scope3" category="Controls" graphicsApi="GmpiGui" >
     <Parameters>
       <Parameter id="0" name="Capture Data A" datatype="blob" private="true" ignorePatchChange="true" isPolyphonic="true" persistant="false"/>
       <Parameter id="1" name="Capture Data B" datatype="blob" private="true" ignorePatchChange="true" isPolyphonic="true" persistant="false"/>
       <Parameter id="2" name="polyDetect" datatype="bool" private="true" ignorePatchChange="true" persistant="false"/>
     </Parameters>
     <Audio>
-      <Pin id="0" name="Capture Data A" direction="out" datatype="blob"  parameterId="0" private="true" isPolyphonic="true"/>
-      <Pin id="1" name="Capture Data B" direction="out" datatype="blob"  parameterId="1" private="true" isPolyphonic="true"/>
+      <Pin id="0" name="Capture Data A" direction="out" datatype="blob" parameterId="0" private="true" isPolyphonic="true"/>
+      <Pin id="1" name="Capture Data B" direction="out" datatype="blob" parameterId="1" private="true" isPolyphonic="true"/>
       <Pin id="2" name="Signal A" datatype="float" rate="audio"/>
       <Pin id="3" name="Signal B" datatype="float" rate="audio"/>
       <Pin id="4" name="VoiceActive" hostConnect="Voice/Active" datatype="float" isPolyphonic="true" />

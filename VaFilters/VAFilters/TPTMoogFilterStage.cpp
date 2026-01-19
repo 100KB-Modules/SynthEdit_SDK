@@ -1,11 +1,11 @@
 #include "TPTMoogFilterStage.h"
 
-CTPTMoogFilterStage::CTPTMoogFilterStage(void)
+CTPTMoogFilterStage::CTPTMoogFilterStage()
 {
 	sampleRate = 44100;
 }
 
-CTPTMoogFilterStage::~CTPTMoogFilterStage(void)
+CTPTMoogFilterStage::~CTPTMoogFilterStage()
 {
 }
 

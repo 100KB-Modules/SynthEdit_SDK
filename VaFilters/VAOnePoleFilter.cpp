@@ -2,7 +2,7 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 
-CVAOnePoleFilter::CVAOnePoleFilter(void)
+CVAOnePoleFilter::CVAOnePoleFilter()
 {
 	m_fAlpha = 1.0;
 	m_fBeta = 1.0;

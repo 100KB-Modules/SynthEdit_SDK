@@ -1,4 +1,7 @@
-#include ".\ImpulseResponseGui.h"
+#include "./ImpulseResponseGui.h"
+
+#if defined(_WIN32) && !defined(_WIN64)
+
 #define SCOPE_BUFFER_SIZE 512
 
 REGISTER_GUI_PLUGIN(ImpulseResponseGui, L"SE Impulse Response");
@@ -301,3 +304,4 @@ int32_t ImpulseResponseGui::paint(HDC hDC)
 	return gmpi::MP_OK;
 }
 
+#endif

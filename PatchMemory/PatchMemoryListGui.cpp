@@ -6,6 +6,7 @@
 #include "../se_sdk3/it_enum_list.h"
 
 REGISTER_GUI_PLUGIN( PatchMemoryListGui, L"SE PatchMemory List3" );
+SE_DECLARE_INIT_STATIC_FILE(PatchMemoryList3_Gui)
 
 #define INIT_PINB( pinId, name ) initializePin( pinId, pin##name, static_cast<MpGuiBaseMemberPtr>( &PatchMemoryListGui::on##name##Changed ) );
 

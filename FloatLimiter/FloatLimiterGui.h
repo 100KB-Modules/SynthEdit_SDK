@@ -1,7 +1,7 @@
 #ifndef FLOATLIMITERGUI_H_INCLUDED
 #define FLOATLIMITERGUI_H_INCLUDED
 
-#include "MP_SDK_GUI.h"
+#include "mp_sdk_gui.h"
 #include "TimerManager.h"
 
 class FloatLimiterGui : public MpGuiBase, public TimerClient

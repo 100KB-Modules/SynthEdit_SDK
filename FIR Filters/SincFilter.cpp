@@ -1,11 +1,14 @@
 #define _USE_MATH_DEFINES
 #include <math.h>
 #include <algorithm>
+#include <numeric>
 #include "Sinc.h"
 #include "../shared/xp_simd.h"
 #include "./SincFilter.h"
+#include "mp_sdk_gui2.h"
 
-REGISTER_PLUGIN2 (SincFilterLpHp, L"SE Sinc Lowpass Filter" );
+REGISTER_PLUGIN2(SincFilterLpHp, L"SE Sinc Lowpass Filter");
+REGISTER_PLUGIN2(SincFilterHp, L"SE Sinc Highpass Filter");
 
 SincFilterLpHp::SincFilterLpHp( )
 {
@@ -20,12 +23,12 @@ void SincFilterLpHp::subProcess(int sampleFrames)
 {
 	// get pointers to in/output buffers.
 	const float* signal = getBuffer(pinSignal);
-	float* output = getBuffer(pinOutput);
+	float* __restrict output = getBuffer(pinOutput);
 
 	const auto numCoefs = coefs.size();
 
 	// maintain history as contiguous samples by shifting left each time.
-	memcpy(&(hist[numCoefs]), signal, sizeof(float) * sampleFrames);
+	std::copy(signal, signal + sampleFrames, hist.begin() + numCoefs);
 
 #ifndef GMPI_SSE_AVAILABLE
 
@@ -50,8 +53,77 @@ void SincFilterLpHp::subProcess(int sampleFrames)
 	}
 
 #else
-	// Process 4 samples at a time.
+#if 1
 
+	// Process first coefs (copy to output).
+	const float* __restrict h = hist.data();
+#if 0
+	{
+		float* out = output;
+		float* hi = h;
+
+		// process fiddly non-sse-aligned prequel.
+		int s{};
+		for (; s < sampleFrames && reinterpret_cast<intptr_t>(out) & 0x0f ; ++s)
+		{
+			*out++ = *hi++ * coefs[0];
+		}
+
+		const __m128 tap = _mm_set_ps1(coefs[0]);
+		for (; s < sampleFrames; s += 4)
+		{
+			_mm_storeu_ps(out, _mm_mul_ps(_mm_loadu_ps(hi), tap));
+			hi += 4;
+			out += 4;
+		}
+	}
+#else
+	{
+		const auto coef = coefs[0];
+		std::transform(h, h + sampleFrames, output, [coef](auto& n) {return coef * n; });
+	}
+#endif
+
+	// Process remaining coefs (add to output).
+	{
+		for (unsigned int t = 1; t < numCoefs; ++t)
+		{
+			++h; // shift window right
+
+#if 0
+			// 1.5% CPU
+			const auto& coef = coefs[t];
+			std::transform(h, h + sampleFrames, output, output, [coef](const float& n, const float& o) {return o + coef * n; });
+#else
+			// 0.26% CPU
+			const float* hi = h;
+			float* out = output;
+
+			// process fiddly non-sse-aligned prequel.
+			int s{};
+			for (; s < sampleFrames && reinterpret_cast<intptr_t>(out) & 0x0f; ++s)
+			{
+				*out++ = *hi++ * coefs[t];
+				s++;
+			}
+
+			const __m128 tap = _mm_set_ps1(coefs[t]);
+
+			for (; s < sampleFrames; s += 4)
+			{
+				// output[s] += h[s] * taps[t];
+				_mm_storeu_ps(out, _mm_add_ps(_mm_loadu_ps(out), _mm_mul_ps(_mm_loadu_ps(hi), tap)));
+				hi += 4;
+				out += 4;
+			}
+#endif
+		}
+	}
+
+#else
+	// FAULTY: WRITES OVER END OF BUFFER becuase it does not align writes to SSE boundary, just goes to the last sample plus (up to) 3 more. which is too far when buffer ALREADY aligns on SSE
+	// 
+	// Process 4 samples at a time.
 	float* h = hist.data();
 
 	// Process first coefs (copy).
@@ -60,13 +132,14 @@ void SincFilterLpHp::subProcess(int sampleFrames)
 	float* out = output;
 	for (int s = 0; s < sampleFrames; s += 4)
 	{
-		_mm_storeu_ps(out, _mm_mul_ps(_mm_load_ps(h2), tap));
+		_mm_storeu_ps(out, _mm_mul_ps(_mm_loadu_ps(h2), tap));
 		h2 += 4;
 		out += 4;
 	}
 
+
 	// Process remaining coefs (add).
-	for (int t = 1; t < numCoefs; ++t)
+	for (unsigned int t = 1; t < numCoefs; ++t)
 	{
 		h2 = h++;
 		tap = _mm_set_ps1(coefs[t]);
@@ -81,9 +154,10 @@ void SincFilterLpHp::subProcess(int sampleFrames)
 	}
 
 #endif
+#endif
 
 	// shift history.
-	memcpy(hist.data(), &hist[sampleFrames], sizeof(float) * numCoefs);
+	std::copy(hist.begin() + sampleFrames, hist.begin() + sampleFrames + numCoefs, hist.begin());
 }
 
 void SincFilterLpHp::subProcessStatic(int sampleFrames)
@@ -99,20 +173,27 @@ void SincFilterLpHp::subProcessStatic(int sampleFrames)
 	staticCount -= sampleFrames;
 }
 
+int calcAlignedTaps(int selectedTaps)
+{
+	const int sseAlign = 4;
+	const int alignedTaps = ((std::max)(1, selectedTaps) + sseAlign - 1) & -(sseAlign);
+	return alignedTaps;
+}
+
 void SincFilterLpHp::onSetPins()
 {
 	if (pinTaps.isUpdated() || pinCuttoffkHz.isUpdated() )
 	{
 		double cuttoff = 1000.0f * pinCuttoffkHz / getSampleRate();
-		const int sseAlign = 4;
-		int alignedTaps = ((std::max)(1, pinTaps.getValue()) + sseAlign - 1) & -(sseAlign);
+		const int alignedTaps = calcAlignedTaps(pinTaps.getValue());
 		coefs.resize(alignedTaps);
-		calcWindowedSinc(cuttoff, alignedTaps, coefs.data());
+		calcWindowedSinc(cuttoff, isHighPass(), alignedTaps, coefs.data());
 
-		int32_t blockSize;
-		getHost()->getBlockSize(blockSize);
+		const auto blockSize = host.getBlockSize();
 		const int numCoefs = static_cast<int>(coefs.size());
 		hist.assign(numCoefs + blockSize, 0.0f);
+
+		host.SetLatency(alignedTaps / 2);
 	}
 
 	// Set state of output audio pins.
@@ -128,11 +209,36 @@ void SincFilterLpHp::onSetPins()
 		staticCount = static_cast<int>(hist.size());
 		setSubProcess(&SincFilterLpHp::subProcessStatic);
 	}
-
-	// Set sleep mode (optional).
-	// setSleep(false);
 }
 
+#if 0 // deprecated. use host.SetLatency() from processor
+class SincFilterController : public GmpiSdk::Controller
+{
+public:
+	int32_t MP_STDCALL setPinDefault(int32_t pinType, int32_t pinId, const char* defaultValue) override
+	{
+		if (pinType == 0 && pinId == 2) // taps
+		{
+			const auto tapCount = atoi(defaultValue);
+			const int alignedTaps = calcAlignedTaps(tapCount);
+			getHost()->setLatency(alignedTaps / 2);
+		}
+
+		return GmpiSdk::Controller::setPinDefault(pinType, pinId, defaultValue);
+	}
+
+	GMPI_REFCOUNT;
+	GMPI_QUERYINTERFACE1(gmpi::MP_IID_CONTROLLER, gmpi::IMpController);
+};
+
+namespace
+{
+	bool r[] = {
+		gmpi::Register<SincFilterController>::withId(L"SE Sinc Highpass Filter"),
+		gmpi::Register<SincFilterController>::withId(L"SE Sinc Lowpass Filter"),
+	};
+}
+#endif
 
 /*
 float* h = hist;
@@ -236,65 +342,4 @@ for (int s = 0; s < histSize - sampleFrames + 3; s = s + 4)
 *dest++ = _mm_loadu_ps(src);
 src += 4;
 }
-*/
-/*
-
-
-
-
-int _tmain(int argc, _TCHAR* argv[])
-{
-const int sincTapCount = 171;
-
-float sincTaps[sincTapCount];
-
-calcWin dowedSinc( 0.25, sincTapCount, sincTaps );
-/*
-for( int i = 0 ; i < sincTapCount ; ++i )
-{
-_RPT1( _CRT_WARN, "%f\n", sincTaps[i] );
-}
-* /
-int bufferIndex = 0; // whatever
-float samples[2000];
-for( int i = 0 ; i < 2000 ; ++i )
-{
-samples[i] = ( i & 0x20 ) == 0 ? 1.0f : -1.0f;
-}
-
-float buffer[sincTapCount];
-memset( buffer, 0 , sizeof(buffer) );
-int sampleFrames = 200;
-
-
-float* in = samples;
-
-for( int s = 0 ; s < sampleFrames ; ++s )
-{
-// store input history to bufffer.
-buffer[bufferIndex++] = *in++;
-if( bufferIndex == sincTapCount )
-{
-bufferIndex = 0;
-}
-
-// convolve SINC FIR with bufer.
-float a = 0;
-int bi = bufferIndex;
-for( int i = 0 ; i < sincTapCount ; ++i )
-{
-a += sincTaps[i] * buffer[bufferIndex++];
-if( bufferIndex == sincTapCount )
-{
-bufferIndex = 0;
-}
-}
-
-// *out++ - a;
-_RPT2( _CRT_WARN, "%d, %f\n", s, a );
-}
-
-return 0;
-}
-
 */

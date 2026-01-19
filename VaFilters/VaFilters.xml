@@ -20,7 +20,7 @@
     </Audio>
   </Plugin>
   
-  <Plugin id="SE Korg Filter" name="Korg Filter" category="Experimental/VA" >
+  <Plugin id="SE Korg Filter" name="Korg Filter" category="Filters/VA" >
     <Audio>
       <Pin id="0" name="Signal" datatype="float" rate="audio"/>
       <Pin id="1" name="Pitch" datatype="float" rate="audio" default="0.5" />
@@ -31,18 +31,18 @@
       <Pin id="6" name="Output" datatype="float" rate="audio" direction="out" />
     </Audio>
   </Plugin>
-  <Plugin id="SE Moog Filter" name="Moog Filter" category="Experimental/VA" >
+  <Plugin id="SE Moog Filter" name="Moog Filter" category="Filters/VA" >
     <Audio>
       <Pin id="0" name="Signal" datatype="float" rate="audio"/>
       <Pin id="1" name="Pitch" datatype="float" rate="audio" default="0.5" />
       <Pin id="2" name="Resonance" datatype="float" rate="audio" default="0.5" />
-      <Pin id="3" name="Saturation" datatype="float" />
+      <Pin id="3" name="Saturation" datatype="float" private="true" />
       <Pin id="4" name="Mode" datatype="enum" metadata="Low Pass" />
-      <Pin id="5" name="Saturator" datatype="bool" />
+      <Pin id="5" name="Saturator" datatype="bool" private="true" />
       <Pin id="6" name="Output" datatype="float" rate="audio" direction="out" />
     </Audio>
   </Plugin>
-  <Plugin id="SE SV Filter4" name="StateVar Filter" category="Experimental/VA" >
+  <Plugin id="SE SV Filter4" name="StateVar Filter" category="Filters/VA" >
     <Audio>
       <Pin name="Signal" datatype="float" rate="audio" />
       <Pin name="Pitch" datatype="float" rate="audio" default="0.5" />
@@ -52,7 +52,7 @@
       <Pin name="Output" datatype="float" rate="audio" direction="out" />
     </Audio>
   </Plugin>
-  <Plugin id="SE SV Filter4B" name="StateVar Filter (multi)" category="Experimental/VA" >
+  <Plugin id="SE SV Filter4B" name="StateVar Filter (multi)" category="Filters/VA" >
     <Audio>
       <Pin name="Signal" datatype="float" rate="audio" />
       <Pin name="Pitch" datatype="float" rate="audio" default="0.5" />
@@ -62,14 +62,15 @@
       <Pin name="Band Pass" datatype="float" rate="audio" direction="out" />
       <Pin name="Band Reject" datatype="float" rate="audio" direction="out" />
     </Audio>
-  </Plugin>  <Plugin id="SE Moog Filter test" name="Moog Filter (reference)" category="Experimental/VA" >
+  </Plugin>
+  <Plugin id="SE Moog Filter test" name="Moog Filter (reference)" category="Filters/VA" >
     <Audio>
       <Pin id="0" name="Signal" datatype="float" rate="audio"/>
       <Pin id="1" name="Pitch" datatype="float" rate="audio" default="0.5" />
       <Pin id="2" name="Resonance" datatype="float" rate="audio" default="0.5" />
-      <Pin id="3" name="Saturation" datatype="float" />
+      <Pin id="3" name="Saturation" datatype="float" private="true" />
       <Pin id="4" name="Mode" datatype="enum" metadata="Low Pass" />
-      <Pin id="5" name="Saturator" datatype="bool" />
+      <Pin id="5" name="Saturator" datatype="bool" private="true" />
       <Pin id="6" name="Output" datatype="float" rate="audio" direction="out" />
     </Audio>
   </Plugin>

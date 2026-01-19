@@ -9,9 +9,21 @@ class FreqAnalyserGui :
 {
 	GmpiDrawing::Bitmap cachedBackground_;
 	float GraphXAxisYcoord;
-	float currentBackgroundSampleRate;
+	float currentBackgroundSampleRate = 0.f;
 	GmpiDrawing::PathGeometry geometry;
 	GmpiDrawing::PathGeometry lineGeometry;
+
+	struct binData
+	{
+		int index;
+		float fraction;
+	};
+	std::vector<binData> pixelToBin;
+
+	std::vector<GmpiDrawing::Point> graphValues;
+	std::vector<GmpiDrawing::Point> responseOptimized;
+	float samplerate = 44100;
+	int spectrumCount = 0;
 
 public:
 	FreqAnalyserGui();

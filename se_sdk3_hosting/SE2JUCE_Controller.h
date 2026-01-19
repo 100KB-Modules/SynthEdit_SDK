@@ -4,6 +4,7 @@
 #include <vector>
 #include "Controller.h"
 #include "IProcessorMessageQues.h"
+#include "./ProcessorStateManager.h"
 
 struct IHasDirty
 {
@@ -19,6 +20,7 @@ class MpParameterJuce : public MpParameter_native
 	bool isInverted_ = false;
 	int hostTag = -1;	// index, sequential.
 	bool dawGrabbed = false; // the grabbed state we last sent to the DAW (logical OR of all grabbers)
+	juce::AudioProcessorParameter* juceParameter = {};
 
 	float adjust(float normalised) const
 	{
@@ -28,10 +30,14 @@ class MpParameterJuce : public MpParameter_native
 public:
 
 	MpParameterJuce(class SeJuceController* controller, int ParameterIndex, bool isInverted);
-
+	void setJuceParameter(juce::AudioProcessorParameter* parameter)
+	{
+		juceParameter = parameter;
+	}
 	int getNativeTag() override { return hostTag; }
 
 	void setNormalizedUnsafe(float daw_normalized);
+	void updateDawUnsafe(const std::string& rawValue) override;
 
 	// on the foreground thread, update the parameter from the unsafe value provided by the DAW
 	void updateFromImmediate();
@@ -65,15 +71,21 @@ public:
 
 class SeJuceController : public MpController, public IHasDirty, private juce::Timer, public IProcessorMessageQues
 {
+protected:
 	std::atomic<bool> juceParameters_dirty;
 	std::vector<MpParameterJuce* > tagToParameter;			// DAW parameter Index to parameter
 	class SE2JUCE_Processor* processor = {};
     interThreadQue queueToDsp_;
+	std::atomic<DawPreset const*> interrupt_preset_ = {};
+	ProcessorStateMgrVst3& dawStateManager;
 
 public:
-	SeJuceController();
+	SeJuceController(
+		ProcessorStateMgrVst3& dawState
+	);
+	virtual ~SeJuceController() {}
 
-	void Initialize(SE2JUCE_Processor* pprocessor) 
+	virtual void Initialize(SE2JUCE_Processor* pprocessor) 
 	{
 		processor = pprocessor;
 
@@ -84,7 +96,7 @@ public:
 
 		// SE Timer suffers under JUCE, becomes very unresponsive.
 //		StartTimer(35); // SE. approx 30Hz
-		startTimerHz(24); // JUCE. 
+		startTimerHz(30); // JUCE. 
 	}
 
 	void OnStartupTimerExpired() override;
@@ -94,6 +106,9 @@ public:
 		return tagToParameter;
 	}
 
+	void setPresetXmlFromSelf(const std::string& xml) override;
+	void setPresetFromSelf(DawPreset const* preset) override;
+	void setPresetUnsafe(DawPreset const* preset);
 	std::string loadNativePreset(std::wstring sourceFilename) override
 	{
 		return {};
@@ -105,7 +120,8 @@ public:
 		return L"xmlpreset";
 	}
 	std::vector< MpController::presetInfo > scanFactoryPresets() override;
-	void loadFactoryPreset(int index, bool fromDaw) override;
+//	void loadFactoryPreset(int index, bool fromDaw) override;
+	std::string getFactoryPresetXml(std::string filename) override;
 
 	// IHasDirty
 	void setDirty() override
@@ -116,14 +132,17 @@ public:
 // SE	bool OnTimer() override
 	void timerCallback() override // JUCE timer
 	{
-		if (juceParameters_dirty.load(std::memory_order_relaxed))
+		if (const auto pdirty = juceParameters_dirty.exchange(false, std::memory_order_relaxed); pdirty)
 		{
-			juceParameters_dirty.store(false, std::memory_order_release);
-
 			for (auto p : tagToParameter)
 			{
 				p->updateFromImmediate();
 			}
+		}
+
+		if (auto preset = interrupt_preset_.exchange(nullptr, std::memory_order_relaxed); preset)
+		{
+			setPreset(preset);
 		}
 
 		// SE return MpController::OnTimer();
@@ -150,6 +169,7 @@ public:
 
 	void ParamGrabbed(MpParameter_native* param) override;
 	void ParamToProcessorAndHost(MpParameterJuce* param);
+	void ParamToDsp(MpParameter* param, int32_t voiceId = 0) override;
 
 	MpParameter_native* makeNativeParameter(int, bool isInverted = false) override
 	{
@@ -159,9 +179,9 @@ public:
 		return tagToParameter.back();
 	}
 
-//	void OnInitialPresetRecieved();
-
 	void initGuiParameters();
+
+	void OnLatencyChanged() override;
 
 	// IProcessorMessageQues
 	IWriteableQue* MessageQueToGui()  override
@@ -176,5 +196,9 @@ public:
 	IWriteableQue* getQueueToDsp() override
 	{
 		return &queueToDsp_;
+	}
+	InterThreadQueBase* ControllerToStateMgrQue()
+	{
+		return dawStateManager.ControllerToStateMgrQue();
 	}
 };

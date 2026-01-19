@@ -43,15 +43,15 @@ struct MIDIHeaderChunk
 	unsigned char Tracks_lo;
 	unsigned char Division_hi;
 	unsigned char Division_lo;
-	unsigned short GetFormat(void)
+	unsigned short GetFormat()
 	{
 		return ((unsigned short)Format_hi << 8) + Format_lo;
 	};
-	unsigned short GetTracks(void)
+	unsigned short GetTracks()
 	{
 		return ((unsigned short)Tracks_hi << 8) + Tracks_lo;
 	};
-	unsigned short GetDivision(void)
+	unsigned short GetDivision()
 	{
 		return ((unsigned short)Division_hi << 8) + Division_lo;
 	};

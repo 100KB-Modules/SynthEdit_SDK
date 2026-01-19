@@ -6,13 +6,6 @@
 
 using namespace std;
 
-// Use ASM on 32-bit MS Windows.
-#if defined(_MSC_VER )
-	#if !defined(_M_X64)
-		#define SE_USE_ASM
-	#endif
-#endif
-
 // tc = 1200 * log2( s )
 //    = 1200 * ln(s)/ln(2)
 //    = 1731 * ln(s)
@@ -196,13 +189,14 @@ _RPT0(_CRT_WARN, "sub_process5\n" );
 #endif
 }
 
-void Envelope::onSetPins(void)
+void Envelope::onSetPins()
 {
 	bool rechooseProcess = false;
 
 	if( pinOverallLevel.isUpdated() )
 	{
-		// _RPT1(_CRT_WARN, "pinOverallLevel %f\n", (float) pinOverallLevel );
+//		const char* state = pinOverallLevel.isStreaming() ? "Streaming" : "Static";
+//		_RPTN(_CRT_WARN, "pinOverallLevel %f %s\n", (float) pinOverallLevel, state);
 		rechooseProcess = true;
 	}
 
@@ -223,7 +217,8 @@ void Envelope::onSetPins(void)
 
 	if( pinGate.isUpdated() || pinTrigger.isUpdated() || forcedReset )
 	{
-//		_RPT2(_CRT_WARN, "Envelope::onSetPins. G%.3f  T%.3f\n", pinGate.getValue(), pinTrigger.getValue() );
+//		_RPT2(_CRT_WARN, "Envelope::onSetPins. G%.3f  T%.3f\n", pinGate.getValue(), pinTrigger.getValue());
+//		_RPTN(_CRT_WARN, "Envelope::Sus %.3f\n", level_plugs[1]->getValue());
 
 		if(	pinGate.isStreaming() || pinTrigger.isStreaming() )
 		{
@@ -409,11 +404,11 @@ EnvelopeBase::EnvelopeBase( IMpUnknown* host ) : MpBase(host)
 	current_segment_func = static_cast <SubProcess_ptr> ( &EnvelopeBase::sub_process7 );
 }
 
-int32_t MP_STDCALL EnvelopeBase::open()
+int32_t EnvelopeBase::open()
 {
 	cur_segment = end_segment;
 	return MpBase::open();
-};
+}
 
 // gate or trigger pin streaming...
 void EnvelopeBase::process_with_gate(int start_pos, int sampleframes)
@@ -590,52 +585,6 @@ void EnvelopeBase::sub_process6(int start_pos, int sampleframes)
 
 	sampleframesRemain = sampleframes - count;
 
-#if defined(SE_USE_ASM)
-	float* output_ptr = pinSignalOut.getBuffer(); // NOTE: start_pos is added in ASM.
-
-	__asm
-	{
-	mov	eax,dword ptr [this] // eax holds 'this' pointer
-
-	//      float *out_ptr = start_pos + output_ptr;
-//	mov     ecx,dword ptr [eax].output_ptr
-	mov     ecx,dword ptr output_ptr
-	mov     edx,dword ptr start_pos
-	lea     esi,[ecx+edx*4]			// edx holds output_ptr
-
-	add		edx, count
-	lea     edx,[ecx+edx*4]			// calc final output ptr
-
-	//	while( out_ptr != final_out_ptr )
-	cmp		edx, esi
-	je	 skip_loop // avoid loop if count is zero
-
-	//	output_val += fixed_increment * (float) count;
-	fld		dword ptr [eax].fixed_increment
-	fimul	dword ptr count
-	fadd	dword ptr [eax].output_val
-	fstp	dword ptr [eax].output_val
-
-	// load scaled inc and out_val
-	fld		dword ptr [eax].m_scaled_increment
-	fld		dword ptr [eax].m_scaled_output_val
-
-loop_top:
-	fadd	st(0), st(1)	// scaled_output_val += scaled_increment;
-
-	fst		dword ptr [esi]	// *out++ = scaled_output_val;
-	add		esi, 4
-
-	cmp		edx, esi
-	jne		loop_top
-
-	// cleanup
-	fstp	dword ptr [eax].m_scaled_output_val
-	fstp    st(0)		// pop 'scaled_increment'
-skip_loop:
-	}
-#else
-
 	float* output_ptr = start_pos + pinSignalOut.getBuffer();
 	for( int i = count ; i > 0 ; --i )
 	{
@@ -644,8 +593,6 @@ skip_loop:
 	}
 
 	output_val += fixed_increment * (float) count; // so next routine knows where to start
-
-#endif
 
 // done in asm	output_val += count * fixed_increment; // so next routine knows where to start
 

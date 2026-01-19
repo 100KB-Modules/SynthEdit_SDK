@@ -1,5 +1,6 @@
 #include "./KorgFilter.h"
 #include <limits.h>
+#include <mutex>
 
 REGISTER_PLUGIN2 ( KorgFilter, L"SE Korg Filter" );
 
@@ -23,6 +24,10 @@ KorgFilter::KorgFilter()
 
 int32_t KorgFilter::open()
 {
+	// fix for race conditions.
+	static std::mutex safeInit;
+	std::lock_guard<std::mutex> lock(safeInit);
+
 	m_LPF1.m_uFilterType = LPF1;
 	m_LPF2.m_uFilterType = LPF1;
 	m_HPF1.m_uFilterType = HPF1;
@@ -42,6 +47,8 @@ int32_t KorgFilter::open()
 	int32_t needInitialize;
 	getHost()->allocateSharedMemory(L"KorgFilter:Pitch", (void**)&pitchTable, getSampleRate(), size, needInitialize);
 
+	safeMaxHz = 0.4782f * getSampleRate(); // stability limit.
+
 	if (needInitialize)
 	{
 		float T = 1.0f / getSampleRate();
@@ -49,7 +56,7 @@ int32_t KorgFilter::open()
 		{
 			float pitch = pitchTableLowVolts + (i - extraEntriesAtStart) / (float)entriesPerOctave;
 			float hz = 440.f * powf(2.f, pitch - 5.f);
-			hz = (std::min)(hz, getSampleRate() * 0.49f); // stability limit.
+			hz = (std::min)(hz, safeMaxHz);
 
 			double wd = 2 * M_PI * hz;
 			double T = 1 / (double)getSampleRate();
@@ -80,7 +87,7 @@ int32_t KorgFilter::open()
 	return FilterBase::open();
 }
 
-void KorgFilter::onSetPins(void)
+void KorgFilter::onSetPins()
 {
 	// Check which pins are updated.
 	if (pinPitch.isUpdated() && !pinPitch.isStreaming())
@@ -94,10 +101,6 @@ void KorgFilter::onSetPins(void)
 		{
 			ResonanceFixed::CalcInitial(pinResonance, pinPitch, coef_R);
 		}
-	}
-
-	if (pinMode.isUpdated())
-	{
 	}
 
 	// Set state of output audio pins.
