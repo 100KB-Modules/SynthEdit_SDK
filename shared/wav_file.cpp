@@ -99,7 +99,8 @@ void WavFile::write( const std::string & filename, unsigned int bps )
 		const auto sample_count = samples_.size() / numchans_;
 		src = samples_.data();
 
-		wave_file_header wav_head;
+		// Fix: Initialize wave_file_header struct to zero in WavFile::write
+		wave_file_header wav_head = {};
 		memcpy(wav_head.chnk1_name, "RIFF", 4);
 		memcpy(wav_head.chnk2_name, "WAVE", 4);
 		memcpy(wav_head.chnk3_name, "fmt ", 4);
@@ -133,11 +134,10 @@ void WavFile::write( const std::string & filename, unsigned int bps )
 		}
 
 		myfile.write((char*)&wav_head, 44);
-		float* samples[2];
+
+		std::vector<float*> samples;
 		for (int c = 0; c < wav_head.nChannels; ++c)
-		{
-			samples[c] = src + c * sample_count;
-		}
+			samples.push_back(src + c * sample_count);
 
 		if (floatFormat)
 		{
@@ -261,7 +261,7 @@ void WavFile::readWavData( const std::string & filename, int maxChannels, int ex
 	memset(&waveheader, 0, sizeof(waveheader));
 
 	int chunkLength;
-	char chunkName[4];
+	char chunkName[4]{};
 	myfile.read((char*)&chunkName, 4);
 
 	if (chunkName[0] != 'R' || chunkName[1] != 'I' || chunkName[2] != 'F' || chunkName[3] != 'F') // RIFF.
@@ -479,7 +479,8 @@ std::unique_ptr<WavFileCursor> WavFileStreaming::open(const std::string& pfilena
 	}
 
 	unsigned int chunkLength;
-	char chunkName[4];
+	// Fix: Initialize chunkName array to zero in WavFileStreaming::open
+	char chunkName[4]{};
 	myfile.read((char*)&chunkName, 4);
 
 	if (chunkName[0] != 'R' || chunkName[1] != 'I' || chunkName[2] != 'F' || chunkName[3] != 'F') // RIFF.

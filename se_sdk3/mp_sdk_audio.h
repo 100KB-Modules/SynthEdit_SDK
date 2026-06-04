@@ -94,6 +94,12 @@ namespace GmpiSdk
 				host2->setLatency(latency);
 			}
 		}
+		bool isCloned() const
+		{
+			int32_t s{};
+			Get()->isCloned(&s);
+			return s != 0;
+		}
 		/*
 
 		// Query sample-rate.
@@ -760,6 +766,11 @@ public:
 	{
 		return host.getSampleRate();
 	}
+	bool isCloned() const
+	{
+		return host.isCloned();
+	}
+
 	void resetSleepCounter();
 //	void wakeSubProcessAtLeastOnce();
 	void nudgeSleepCounter()
